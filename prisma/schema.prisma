@@ -1,0 +1,158 @@
+// Prisma schema —— qwq-massage 通知分发工具
+// 说明：SQLite 不支持 Prisma 枚举，所以“类型”类字段统一用字符串，
+// 允许值在应用层用常量 + zod 校验（见 src/lib/constants.ts）。
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// 用户（含管理员、Owner、IAM 子账号）
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  passwordHash String? // 仅 SSO 登录的用户可为空
+  displayName  String?
+  role         String    @default("OWNER") // OWNER | ADMIN | IAM
+  status       String    @default("ACTIVE") // ACTIVE | DISABLED
+
+  // SSO 关联（qwq-sso）
+  ssoProvider String?
+  ssoSubject  String?
+
+  // IAM 子账号：parentId 指向主账号
+  parentId    String?
+  parent      User?   @relation("UserChildren", fields: [parentId], references: [id])
+  children    User[]  @relation("UserChildren")
+  permissions String  @default("{}") // JSON：该子账号可访问的功能/分发方式
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  apiKeys  ApiKey[]
+  callLogs CallLog[]
+
+  @@unique([ssoProvider, ssoSubject])
+}
+
+/// 分组（二级）：属于某种分发方式，内含多个渠道
+model ChannelGroup {
+  id        String   @id @default(cuid())
+  method    String // WEBHOOK | SMS | EMAIL | WECHAT_MP | FEISHU | DINGTALK
+  code      String   @unique // 分组编号，API/模板用它定位
+  name      String
+  strategy  String   @default("ROUND_ROBIN") // ROUND_ROBIN | LEAST_USED
+  enabled   Boolean  @default(true)
+  rrCursor  Int      @default(0) // 轮询指针
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  channels  Channel[]
+  templates Template[]
+}
+
+/// 渠道（三级）：一个具体服务商配置，如“火山引擎A”
+model Channel {
+  id         String        @id @default(cuid())
+  groupId    String
+  group      ChannelGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  provider   String // VOLC | ALIYUN | TENCENT | SMTP | ZEABUR_EMAIL | WEBHOOK | WECHAT_MP | FEISHU | DINGTALK
+  name       String
+  config     String        @default("{}") // JSON：密钥/参数
+  enabled    Boolean       @default(true)
+  weight     Int           @default(1)
+  rateLimitPerMin Int? // 发送限速：每分钟最多发多少条，超了自动跳过该渠道
+  usageCount Int           @default(0)
+  lastUsedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  callLogs   CallLog[]
+}
+
+/// 模板：按编号识别并分发
+model Template {
+  id                 String        @id @default(cuid())
+  code               String        @unique // 模板编号
+  name               String
+  method             String // 对应分发方式
+  groupId            String? // 可选：绑定分组
+  group              ChannelGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  subject            String? // 邮件标题等
+  content            String        @default("") // 正文，含 {{变量}}
+  signName           String? // 短信签名
+  providerTemplateId String? // 服务商侧模板ID
+  variables          String        @default("[]") // JSON：变量清单
+  enabled            Boolean       @default(true)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+}
+
+/// API 密钥：测试 / 生产
+model ApiKey {
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  type            String // TEST | PRODUCTION
+  keyPrefix       String // 展示用前缀
+  keyHash         String    @unique // 哈希后的完整密钥
+  keyEnc          String? // 加密后的完整密钥；仅「受限权限」密钥保存，用于重复查看。全权限密钥不存
+  scopeType       String    @default("FULL") // FULL | SCOPED
+  scopes          String    @default("[]") // JSON：允许的分发方式/接口
+  allowedIps      String    @default("[]") // JSON：生产密钥可信IP
+  rateLimitPerMin Int? // 测试密钥慢速限制（每分钟次数）
+  enabled         Boolean   @default(true)
+  lastUsedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  callLogs CallLog[]
+}
+
+/// 调用日志：支撑首页统计与测试记录
+model CallLog {
+  id           String   @id @default(cuid())
+  apiKeyId     String?
+  apiKey       ApiKey?  @relation(fields: [apiKeyId], references: [id], onDelete: SetNull)
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  method       String // 分发方式
+  templateCode String?
+  groupCode    String?
+  channelId    String?
+  channel      Channel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  source       String   @default("API") // API | TEST（测试服务发起）
+  status       String // SUCCESS | FAILED | RATE_LIMITED
+  errorMsg     String?
+  requestIp    String?
+  latencyMs    Int?
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([method])
+}
+
+/// 操作记录（审计日志）：谁在什么时候做了什么后台操作
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userName  String?
+  action    String // 操作类型，如 channel.create
+  target    String? // 操作对象描述（名称/编号等）
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// 系统设置（键值）：如测试密钥默认限速、SSO 配置等
+model Setting {
+  key       String   @id
+  value     String   @default("{}") // JSON
+  updatedAt DateTime @updatedAt
+}

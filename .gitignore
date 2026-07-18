@@ -32,6 +32,17 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# 但要保留这份不含密钥的模板
+!.env.example
+
+# 本地数据库（内含渠道密钥等敏感数据，绝不能提交）
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# 本地工具设置
+.claude/
 
 # vercel
 .vercel
@@ -39,3 +50,5 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
