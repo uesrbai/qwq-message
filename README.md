@@ -80,21 +80,32 @@ curl -X POST http://localhost:3000/api/v1/send \
 
 ## 部署到 Zeabur
 
-> 线上需用 **PostgreSQL**（容器文件系统重启会丢数据，SQLite 不适合）。
+推荐 **SQLite + 持久磁盘**：代码零改动，本地与线上完全一致，适合内部工具。
 
-1. **创建 Postgres**：在 Zeabur 项目里添加一个 PostgreSQL 服务，复制它的连接串。
-2. **切换数据库类型**：把 `prisma/schema.prisma` 顶部的 `provider = "sqlite"` 改成
-   `provider = "postgresql"`。（`src/lib/db.ts` 会按连接串自动选适配器，无需改动。）
-3. **推送代码**到 GitHub，在 Zeabur 从该仓库部署 Next.js 服务。
-4. **配置环境变量**（Zeabur 服务的 Variables）：
-   - `DATABASE_URL` = 第 1 步的 Postgres 连接串
+1. **部署**：在 Zeabur 从本 GitHub 仓库创建服务（自动识别 Next.js）。
+2. **挂载持久磁盘**（关键，否则重启数据全丢）：
+   服务 → **Volumes** → 新增一块盘，**挂载路径填 `/data`**。
+3. **配置环境变量**（服务 → **Variables**）：
+   - `DATABASE_URL` = `file:/data/prod.db` ← 必须指向磁盘挂载目录
    - `AUTH_SECRET` = 随机 64 位十六进制串
-     （`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`）
+     （生成：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`）
    - `APP_URL` = 你的线上域名
-   - （可选）`QWQ_SSO_*`：用 SSO 时填；生产请用 `sk_live_` 并设 `QWQ_SSO_ALLOWED_EMAILS`
-5. **建表**：把本地 `.env` 的 `DATABASE_URL` 临时指向线上 Postgres，执行一次
-   `npx prisma db push`。
-6. 打开线上域名，创建管理员账号即可。
+   - （可选）`QWQ_SSO_*`：用 SSO 时填；生产用 `sk_live_` 并设 `QWQ_SSO_ALLOWED_EMAILS`
+4. **重新部署**。启动时会自动建表（`start` 脚本已包含 `prisma db push`）。
+5. 打开线上域名，创建管理员账号即可。
+
+> 线上是全新空库，本地配好的渠道**不会**带过去，需在线上重新配一次。
+
+### 备选：改用 PostgreSQL
+
+数据量大或需要多实例时更合适：
+
+1. Zeabur 加一个 PostgreSQL 服务，复制连接串。
+2. 把 `prisma/schema.prisma` 的 `provider = "sqlite"` 改成 `"postgresql"`。
+3. `DATABASE_URL` 填 Postgres 连接串（`src/lib/db.ts` 会自动切换适配器，无需改代码）。
+4. 重新部署，启动时同样会自动建表。
+
+⚠️ 改成 `postgresql` 后，本地的 SQLite 开发环境将无法使用。
 
 ## 清理演示数据
 
