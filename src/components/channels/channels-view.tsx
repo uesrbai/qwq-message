@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Power, Boxes } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, Power, Boxes, ScrollText } from "lucide-react";
 import { useI18n } from "../i18n-provider";
 import {
   providerLabel,
@@ -195,6 +196,13 @@ function GroupCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <Link
+            href={`/logs?group=${encodeURIComponent(group.code)}`}
+            title={c.viewLogs}
+            className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          >
+            <ScrollText className="h-4 w-4" />
+          </Link>
           <form action={setGroupEnabledAction}>
             <input type="hidden" name="id" value={group.id} />
             <input type="hidden" name="enabled" value={(!group.enabled).toString()} />
