@@ -113,9 +113,19 @@ export const PROVIDER_FIELDS: Record<string, FieldDef[]> = {
     { key: "from", label: { zh: "发件人", en: "From" }, placeholder: "Notify <no-reply@example.com>", required: true },
   ],
   ZEABUR_EMAIL: [
-    { key: "apiKey", label: { zh: "Zeabur API Key", en: "Zeabur API Key" }, type: "password", required: true },
-    { key: "from", label: { zh: "发件人地址", en: "From address" }, placeholder: "no-reply@example.com", required: true },
-    { key: "endpoint", label: { zh: "接口地址 (可选，留空用默认)", en: "API endpoint (optional)" }, placeholder: "https://mail.zeabur.app/api/send" },
+    { key: "apiKey", label: { zh: "Zeabur Email API Key", en: "Zeabur Email API Key" }, type: "password", placeholder: "zs_xxxxxxxx", required: true },
+    {
+      key: "from",
+      label: { zh: "发件人（域名需已在 Zeabur 验证）", en: "From (domain must be verified in Zeabur)" },
+      placeholder: "no-reply@yourdomain.com",
+      required: true,
+    },
+    { key: "replyTo", label: { zh: "回复地址 (可选)", en: "Reply-To (optional)" }, placeholder: "support@yourdomain.com" },
+    {
+      key: "endpoint",
+      label: { zh: "接口地址 (可选，留空用官方默认)", en: "API endpoint (optional)" },
+      placeholder: "https://api.zeabur.com/api/v1/zsend/emails",
+    },
   ],
   WECHAT_MP: [
     { key: "appId", label: { zh: "AppID", en: "AppID" }, required: true },

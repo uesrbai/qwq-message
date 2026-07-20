@@ -75,8 +75,15 @@ curl -X POST http://localhost:3000/api/v1/send \
 
 ## 渠道实现状态
 
-已实测：Webhook、SMTP 邮件。已按官方规范实现、待真实账号验证：阿里云/腾讯云/火山
-短信、Zeabur 邮件、微信公众号、飞书、钉钉。各渠道所需参数见「渠道配置」页表单。
+**已真机验证**：Webhook、SMTP 邮件、企业微信群机器人、火山引擎短信。
+**已按官方规范实现、待真实账号验证**：阿里云/腾讯云短信、Zeabur Email、微信公众号、飞书、钉钉。
+各渠道所需参数见「渠道配置」页表单。
+
+### Zeabur Email 接入说明
+1. 在 Zeabur 控制台的 Email 页面**验证你的发信域名**，并创建 API Key（`zs_` 开头）。
+2. 渠道配置里选「Zeabur Email API」，填 API Key 与发件人（必须是已验证域名下的地址）。
+3. 收件人支持逗号分隔的多个地址（总数 ≤ 50）。接口文档：
+   https://zeabur.com/docs/en-US/email/rest-api
 
 ## 部署到 Zeabur
 
