@@ -30,6 +30,15 @@ export function buildSsoLoginUrl(root: string, redirectUri: string) {
   return `${root}/login.html?redirect=${encodeURIComponent(redirectUri)}`;
 }
 
+/**
+ * SSO 回调地址。必须与后台注册的 callback_url 完全一致，
+ * 所以优先用 APP_URL（固定公开域名），代理后面 req 的地址不可靠。
+ */
+export function ssoCallbackUrl(fallbackOrigin: string): string {
+  const base = (process.env.APP_URL || fallbackOrigin).replace(/\/+$/, "");
+  return `${base}/api/auth/sso/callback`;
+}
+
 /** 用本应用的 API Key 校验用户 token，成功返回用户信息 */
 export async function verifySsoToken(token: string): Promise<SsoUser | null> {
   const cfg = getSsoConfig();
