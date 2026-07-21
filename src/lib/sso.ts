@@ -30,14 +30,29 @@ export function buildSsoLoginUrl(root: string, redirectUri: string) {
   return `${root}/login.html?redirect=${encodeURIComponent(redirectUri)}`;
 }
 
+type ReqLike = { headers: Headers; nextUrl: { origin: string; host: string } };
+
 /**
- * SSO 回调地址。必须与后台注册的 callback_url 完全一致，
- * 所以优先用 APP_URL（固定公开域名），代理后面 req 的地址不可靠。
+ * 对外可见的应用根地址。部署在反向代理（Zeabur）后面时，req 自身的地址是内部的
+ * localhost:8080，不能用；优先系统设置里的 appUrl，其次代理转发头 x-forwarded-host。
  */
-export async function ssoCallbackUrl(fallbackOrigin: string): Promise<string> {
+export async function ssoPublicBase(req: ReqLike): Promise<string> {
   const { appUrl } = await getSystemConfig();
-  const base = (appUrl || fallbackOrigin).replace(/\/+$/, "");
-  return `${base}/api/auth/sso/callback`;
+  const configured = appUrl.trim().replace(/\/+$/, "");
+  if (configured) return configured;
+  return baseFromHeaders(req);
+}
+
+/** 不查数据库、纯从转发头推断根地址（异常兜底用） */
+export function baseFromHeaders(req: ReqLike): string {
+  const proto = req.headers.get("x-forwarded-proto") || "https";
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
+  return host ? `${proto}://${host}` : req.nextUrl.origin;
+}
+
+/** SSO 回调地址：必须与 SSO 后台注册的 callback_url 完全一致 */
+export function ssoCallbackUrl(base: string): string {
+  return `${base.replace(/\/+$/, "")}/api/auth/sso/callback`;
 }
 
 /** 用本应用的 API Key 校验用户 token，成功返回用户信息 */

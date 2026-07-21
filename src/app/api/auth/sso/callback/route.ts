@@ -1,24 +1,30 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifySsoToken } from "@/lib/sso";
+import { verifySsoToken, ssoPublicBase, baseFromHeaders } from "@/lib/sso";
 import { getSystemConfig } from "@/lib/system-config";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/session";
 
 // SSO 回调：qwq-sso 带 ?token=... 回来，这里校验并建立本地会话
 export async function GET(req: NextRequest) {
-  const fail = () =>
-    NextResponse.redirect(new URL("/login?error=sso_failed", req.url));
+  // 部署在代理后面时，跳转地址必须用对外域名（不能用内部的 localhost）
+  let base: string;
+  try {
+    base = await ssoPublicBase(req);
+  } catch {
+    base = baseFromHeaders(req);
+  }
+  const fail = () => NextResponse.redirect(`${base}/login?error=sso_failed`);
 
   try {
-    return await handleCallback(req, fail);
+    return await handleCallback(req, base, fail);
   } catch (e) {
     console.error("[sso/callback] error:", e);
     return fail();
   }
 }
 
-async function handleCallback(req: NextRequest, fail: () => NextResponse) {
+async function handleCallback(req: NextRequest, base: string, fail: () => NextResponse) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return fail();
 
@@ -79,7 +85,7 @@ async function handleCallback(req: NextRequest, fail: () => NextResponse) {
     role: user.role,
     name: user.displayName ?? user.username,
   });
-  const res = NextResponse.redirect(new URL("/", req.url));
+  const res = NextResponse.redirect(`${base}/`);
   res.cookies.set(SESSION_COOKIE, sessionToken, {
     httpOnly: true,
     sameSite: "lax",
