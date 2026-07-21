@@ -10,6 +10,15 @@ export async function GET(req: NextRequest) {
   const fail = () =>
     NextResponse.redirect(new URL("/login?error=sso_failed", req.url));
 
+  try {
+    return await handleCallback(req, fail);
+  } catch (e) {
+    console.error("[sso/callback] error:", e);
+    return fail();
+  }
+}
+
+async function handleCallback(req: NextRequest, fail: () => NextResponse) {
   const token = req.nextUrl.searchParams.get("token");
   if (!token) return fail();
 
