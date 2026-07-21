@@ -9,6 +9,7 @@ import {
   FlaskConical,
   KeyRound,
   Settings,
+  SlidersHorizontal,
   LogOut,
   Send,
   ScrollText,
@@ -43,7 +44,13 @@ const NAV: {
       { href: "/logs", key: "logs", icon: ScrollText },
     ],
   },
-  { titleKey: "account", items: [{ href: "/settings", key: "settings", icon: Settings }] },
+  {
+    titleKey: "account",
+    items: [
+      { href: "/system", key: "system", icon: SlidersHorizontal },
+      { href: "/settings", key: "settings", icon: Settings },
+    ],
+  },
 ];
 
 export function Sidebar({

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifySsoToken } from "@/lib/sso";
+import { getSystemConfig } from "@/lib/system-config";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/session";
 
 // SSO 回调：qwq-sso 带 ?token=... 回来，这里校验并建立本地会话
@@ -16,10 +17,11 @@ export async function GET(req: NextRequest) {
   if (!ssoUser || (ssoUser.status && ssoUser.status !== "active")) return fail();
 
   const subject = String(ssoUser.uid_seq ?? ssoUser.id);
+  const sysCfg = await getSystemConfig();
 
   // 可选邮箱白名单
-  const allow = (process.env.QWQ_SSO_ALLOWED_EMAILS ?? "")
-    .split(",")
+  const allow = sysCfg.ssoAllowedEmails
+    .split(/[,，\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
   if (allow.length && ssoUser.email && !allow.includes(ssoUser.email)) return fail();
@@ -54,7 +56,7 @@ export async function GET(req: NextRequest) {
         email,
         username,
         displayName,
-        role: process.env.QWQ_SSO_DEFAULT_ROLE || "ADMIN",
+        role: sysCfg.ssoDefaultRole || "ADMIN",
         ssoProvider: "qwq-sso",
         ssoSubject: subject,
       },

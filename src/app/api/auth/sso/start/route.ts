@@ -4,12 +4,12 @@ import { getSsoConfig, buildSsoLoginUrl, ssoCallbackUrl } from "@/lib/sso";
 
 // 发起 SSO 登录：跳转到 qwq-sso 登录页
 export async function GET(req: NextRequest) {
-  const cfg = getSsoConfig();
+  const cfg = await getSsoConfig();
   if (!cfg) {
     return NextResponse.redirect(new URL("/login?error=sso_not_configured", req.url));
   }
   // 回调地址必须与 SSO 后台注册的 callback_url 完全一致，
-  // 因此优先用 APP_URL（固定公开域名），而非可能被代理改写的请求地址。
-  const redirectUri = ssoCallbackUrl(req.nextUrl.origin);
+  // 因此优先用系统设置里的应用地址，而非可能被代理改写的请求地址。
+  const redirectUri = await ssoCallbackUrl(req.nextUrl.origin);
   return NextResponse.redirect(buildSsoLoginUrl(cfg.root, redirectUri));
 }

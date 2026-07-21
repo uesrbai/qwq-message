@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { isSsoEnabled } from "@/lib/sso";
 import { getI18n } from "@/lib/i18n/server";
 import { AuthShell } from "@/components/auth-shell";
 import { LoginForm } from "@/components/login-form";
@@ -19,7 +20,7 @@ export default async function LoginPage({
   if (session) redirect("/");
 
   const { dict } = await getI18n();
-  const ssoEnabled = Boolean(process.env.QWQ_SSO_BASE_URL && process.env.QWQ_SSO_API_KEY);
+  const ssoEnabled = await isSsoEnabled();
 
   return (
     <AuthShell title={dict.auth.welcomeBack} subtitle={dict.auth.loginSubtitle}>
