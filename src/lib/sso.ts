@@ -76,7 +76,12 @@ export async function exchangeCodeForToken(
   cfg: { root: string; clientId: string; clientSecret: string },
   code: string,
   redirectUri: string,
-): Promise<{ access_token?: string; id_token?: string } | null> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  access_token?: string;
+  id_token?: string;
+}> {
   try {
     const res = await fetch(`${cfg.root}/oauth/token`, {
       method: "POST",
@@ -90,25 +95,52 @@ export async function exchangeCodeForToken(
       }),
       cache: "no-store",
     });
-    if (!res.ok) return null;
-    return (await res.json()) as { access_token?: string; id_token?: string };
-  } catch {
-    return null;
+    if (!res.ok) {
+      // 记录服务端返回体便于排查（例如 redirect_uri_mismatch）
+      const body = await res.text().catch(() => "");
+      console.error(`[sso/token] HTTP ${res.status}:`, body.slice(0, 500));
+      return { ok: false, status: res.status };
+    }
+    const json = (await res.json()) as { access_token?: string; id_token?: string };
+    return { ok: true, status: res.status, ...json };
+  } catch (e) {
+    console.error("[sso/token] fetch error:", e);
+    return { ok: false, status: 0 };
   }
 }
 
 /** 用 access_token 取用户信息 */
-export async function fetchOidcUserInfo(root: string, accessToken: string): Promise<OidcUser | null> {
+export async function fetchOidcUserInfo(
+  root: string,
+  accessToken: string,
+): Promise<{ ok: boolean; status: number; user?: OidcUser }> {
   try {
     const res = await fetch(`${root}/oauth/userinfo`, {
       headers: { Authorization: `Bearer ${accessToken}` },
       cache: "no-store",
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { sub?: string; name?: string; email?: string; status?: string };
-    if (!data?.sub) return null;
-    return { sub: String(data.sub), name: data.name, email: data.email, status: data.status };
-  } catch {
-    return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(`[sso/userinfo] HTTP ${res.status}:`, body.slice(0, 500));
+      return { ok: false, status: res.status };
+    }
+    const data = (await res.json()) as {
+      sub?: string;
+      name?: string;
+      email?: string;
+      status?: string;
+    };
+    if (!data?.sub) {
+      console.error("[sso/userinfo] 无 sub 字段:", JSON.stringify(data).slice(0, 300));
+      return { ok: false, status: res.status };
+    }
+    return {
+      ok: true,
+      status: res.status,
+      user: { sub: String(data.sub), name: data.name, email: data.email, status: data.status },
+    };
+  } catch (e) {
+    console.error("[sso/userinfo] fetch error:", e);
+    return { ok: false, status: 0 };
   }
 }

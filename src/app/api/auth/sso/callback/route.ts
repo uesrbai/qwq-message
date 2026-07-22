@@ -69,11 +69,14 @@ async function handleCallback(
 
   const redirectUri = ssoCallbackUrl(base);
   const tokens = await exchangeCodeForToken(cfg, code, redirectUri);
-  if (!tokens?.access_token) return fail("sso_token");
+  if (!tokens.ok || !tokens.access_token) return fail(`sso_token_${tokens.status}`);
 
-  const ssoUser = await fetchOidcUserInfo(cfg.root, tokens.access_token);
-  if (!ssoUser) return fail("sso_userinfo");
-  if (ssoUser.status && ssoUser.status !== "active") return fail("sso_inactive");
+  const info = await fetchOidcUserInfo(cfg.root, tokens.access_token);
+  if (!info.ok || !info.user) return fail(`sso_userinfo_${info.status}`);
+  const ssoUser = info.user;
+  if (ssoUser.status && ssoUser.status !== "active") {
+    return fail(`sso_inactive_${ssoUser.status}`);
+  }
 
   const subject = ssoUser.sub;
 
