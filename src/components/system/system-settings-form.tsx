@@ -11,8 +11,10 @@ import { useFormValues } from "../ui/use-form-values";
 export type SysConfigView = {
   appUrl: string;
   ssoBaseUrl: string;
+  ssoClientId: string;
   ssoDefaultRole: string;
   ssoAllowedEmails: string;
+  hasClientSecret: boolean;
   hasApiKey: boolean;
   callbackUrl: string;
 };
@@ -45,6 +47,8 @@ export function SystemSettingsForm({ config }: { config: SysConfigView }) {
   const { values, bind, setValues } = useFormValues({
     appUrl: config.appUrl,
     ssoBaseUrl: config.ssoBaseUrl,
+    ssoClientId: config.ssoClientId,
+    ssoClientSecret: "",
     ssoApiKey: "",
     ssoDefaultRole: config.ssoDefaultRole === "IAM" ? "IAM" : "ADMIN",
     ssoAllowedEmails: config.ssoAllowedEmails,
@@ -69,9 +73,24 @@ export function SystemSettingsForm({ config }: { config: SysConfigView }) {
       {/* qwq-sso */}
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-slate-900">{t.ssoSection}</h2>
+        <p className="mt-1 text-xs text-slate-500">{t.ssoSectionHint}</p>
         <div className="mt-4 space-y-4">
           <Field label={t.ssoBaseUrl}>
             <input name="ssoBaseUrl" {...bind("ssoBaseUrl")} placeholder="https://qwqsso.zeabur.app" className={inputCls} />
+          </Field>
+
+          <Field label={t.ssoClientId}>
+            <input name="ssoClientId" {...bind("ssoClientId")} placeholder="app_xxxxxxxx" className={inputCls} />
+          </Field>
+
+          <Field label={`${t.ssoClientSecret}（${config.hasClientSecret ? t.keySet : t.keyUnset}）`} help={t.secretHint}>
+            <input
+              name="ssoClientSecret"
+              type="password"
+              {...bind("ssoClientSecret")}
+              placeholder={config.hasClientSecret ? "••••••••" : "cs_xxxxxxxx"}
+              className={inputCls}
+            />
           </Field>
 
           <Field label={`${t.ssoApiKey}（${config.hasApiKey ? t.keySet : t.keyUnset}）`} help={t.ssoApiKeyHint}>

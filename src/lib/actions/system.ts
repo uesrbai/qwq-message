@@ -20,10 +20,13 @@ export async function saveSystemConfigAction(_prev: SysState, fd: FormData): Pro
   const patch: Record<string, string> = {
     appUrl: s("appUrl").replace(/\/+$/, ""),
     ssoBaseUrl: s("ssoBaseUrl"),
+    ssoClientId: s("ssoClientId"),
     ssoDefaultRole: role === "IAM" ? "IAM" : "ADMIN",
     ssoAllowedEmails: s("ssoAllowedEmails"),
   };
-  // API Key 留空 = 不修改（沿用原值）
+  // 密钥类字段留空 = 不修改（沿用原值）
+  const secret = s("ssoClientSecret");
+  if (secret) patch.ssoClientSecret = secret;
   const apiKey = s("ssoApiKey");
   if (apiKey) patch.ssoApiKey = apiKey;
 

@@ -1,43 +1,38 @@
 import "server-only";
 import { getSystemConfig } from "./system-config";
 
-// qwq-sso 对接（见 https://github.com/uesrbai/qwq-sso）
-// 流程：跳转 {ROOT}/login.html?redirect=<回调> → 用户登录后带 token 回调
-//       → 后端用 API Key 调 {ROOT}/api/v1/auth/verify 校验 token 拿到用户信息
+// qwq-sso 对接 —— OIDC 标准流程（文档第十章）
+//   授权：GET  {root}/oauth/authorize?client_id&redirect_uri&response_type=code&scope&state
+//   换票：POST {root}/oauth/token   { grant_type, code, redirect_uri, client_id, client_secret }
+//   取信息：GET {root}/oauth/userinfo  Authorization: Bearer <access_token>
 
-export type SsoUser = {
-  id: string;
-  uid_seq?: number;
+export type OidcUser = {
+  sub: string; // 用户唯一标识
   name?: string;
   email?: string;
   status?: string;
-  role?: string;
 };
-
-/** 读取并规范化 SSO 配置（优先数据库设置，回落环境变量）。兼容地址带 /api/v1 后缀。 */
-export async function getSsoConfig() {
-  const { ssoBaseUrl, ssoApiKey } = await getSystemConfig();
-  if (!ssoBaseUrl || !ssoApiKey) return null;
-  let root = ssoBaseUrl.trim().replace(/\/+$/, "").replace(/\/api\/v\d+$/i, "");
-  // 用户常忘填协议头，自动补 https://，否则拼出的跳转地址无效
-  if (!/^https?:\/\//i.test(root)) root = `https://${root}`;
-  return { root, apiBase: `${root}/api/v1`, apiKey: ssoApiKey };
-}
-
-export async function isSsoEnabled() {
-  return (await getSsoConfig()) !== null;
-}
-
-export function buildSsoLoginUrl(root: string, redirectUri: string) {
-  return `${root}/login.html?redirect=${encodeURIComponent(redirectUri)}`;
-}
 
 type ReqLike = { headers: Headers; nextUrl: { origin: string; host: string } };
 
-/**
- * 对外可见的应用根地址。部署在反向代理（Zeabur）后面时，req 自身的地址是内部的
- * localhost:8080，不能用；优先系统设置里的 appUrl，其次代理转发头 x-forwarded-host。
- */
+function normalizeRoot(raw: string): string {
+  let root = raw.trim().replace(/\/+$/, "").replace(/\/api\/v\d+$/i, "");
+  if (!/^https?:\/\//i.test(root)) root = `https://${root}`;
+  return root;
+}
+
+/** OIDC 配置：需要 服务地址 + client_id + client_secret */
+export async function getSsoOidcConfig() {
+  const { ssoBaseUrl, ssoClientId, ssoClientSecret } = await getSystemConfig();
+  if (!ssoBaseUrl || !ssoClientId || !ssoClientSecret) return null;
+  return { root: normalizeRoot(ssoBaseUrl), clientId: ssoClientId, clientSecret: ssoClientSecret };
+}
+
+export async function isSsoEnabled() {
+  return (await getSsoOidcConfig()) !== null;
+}
+
+/** 对外可见的应用根地址：系统设置 appUrl > 代理转发头 x-forwarded-host > req 自身 */
 export async function ssoPublicBase(req: ReqLike): Promise<string> {
   const { appUrl } = await getSystemConfig();
   let configured = appUrl.trim().replace(/\/+$/, "");
@@ -48,7 +43,6 @@ export async function ssoPublicBase(req: ReqLike): Promise<string> {
   return baseFromHeaders(req);
 }
 
-/** 不查数据库、纯从转发头推断根地址（异常兜底用） */
 export function baseFromHeaders(req: ReqLike): string {
   const proto = req.headers.get("x-forwarded-proto") || "https";
   const host = req.headers.get("x-forwarded-host") || req.headers.get("host");
@@ -60,23 +54,60 @@ export function ssoCallbackUrl(base: string): string {
   return `${base.replace(/\/+$/, "")}/api/auth/sso/callback`;
 }
 
-/** 用本应用的 API Key 校验用户 token，成功返回用户信息 */
-export async function verifySsoToken(token: string): Promise<SsoUser | null> {
-  const cfg = await getSsoConfig();
-  if (!cfg) return null;
+/** 拼授权页地址 */
+export function buildAuthorizeUrl(
+  root: string,
+  clientId: string,
+  redirectUri: string,
+  state: string,
+): string {
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid profile email",
+    state,
+  });
+  return `${root}/oauth/authorize?${params.toString()}`;
+}
+
+/** 用授权码换令牌 */
+export async function exchangeCodeForToken(
+  cfg: { root: string; clientId: string; clientSecret: string },
+  code: string,
+  redirectUri: string,
+): Promise<{ access_token?: string; id_token?: string } | null> {
   try {
-    const res = await fetch(`${cfg.apiBase}/auth/verify`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${cfg.apiKey}`,
-        "x-user-token": token,
-      },
+    const res = await fetch(`${cfg.root}/oauth/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: redirectUri,
+        client_id: cfg.clientId,
+        client_secret: cfg.clientSecret,
+      }),
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { valid?: boolean; user?: SsoUser };
-    if (!data?.valid || !data?.user) return null;
-    return data.user;
+    return (await res.json()) as { access_token?: string; id_token?: string };
+  } catch {
+    return null;
+  }
+}
+
+/** 用 access_token 取用户信息 */
+export async function fetchOidcUserInfo(root: string, accessToken: string): Promise<OidcUser | null> {
+  try {
+    const res = await fetch(`${root}/oauth/userinfo`, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { sub?: string; name?: string; email?: string; status?: string };
+    if (!data?.sub) return null;
+    return { sub: String(data.sub), name: data.name, email: data.email, status: data.status };
   } catch {
     return null;
   }

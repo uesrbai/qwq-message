@@ -7,7 +7,9 @@ import { getSetting, setSetting } from "./settings";
 export type SystemConfig = {
   appUrl: string;
   ssoBaseUrl: string;
-  ssoApiKey: string;
+  ssoClientId: string;
+  ssoClientSecret: string;
+  ssoApiKey: string; // 开放 API 用（可选，OIDC 登录不需要）
   ssoDefaultRole: string;
   ssoAllowedEmails: string;
 };
@@ -27,13 +29,15 @@ export async function getSystemConfig(): Promise<SystemConfig> {
   return {
     appUrl: pick(saved.appUrl, process.env.APP_URL),
     ssoBaseUrl: pick(saved.ssoBaseUrl, process.env.QWQ_SSO_BASE_URL),
+    ssoClientId: pick(saved.ssoClientId, process.env.QWQ_SSO_CLIENT_ID),
+    ssoClientSecret: pick(saved.ssoClientSecret, process.env.QWQ_SSO_CLIENT_SECRET),
     ssoApiKey: pick(saved.ssoApiKey, process.env.QWQ_SSO_API_KEY),
     ssoDefaultRole: pick(saved.ssoDefaultRole, process.env.QWQ_SSO_DEFAULT_ROLE, "ADMIN"),
     ssoAllowedEmails: pick(saved.ssoAllowedEmails, process.env.QWQ_SSO_ALLOWED_EMAILS),
   };
 }
 
-/** 部分更新；空字段保持原值（用于「API Key 留空则不改」这类场景由调用方控制） */
+/** 部分更新；空字段保持原值（用于「密钥留空则不改」这类场景由调用方控制） */
 export async function saveSystemConfig(patch: Partial<SystemConfig>): Promise<void> {
   const cur = await getSetting<Partial<SystemConfig>>(KEY, {});
   await setSetting(KEY, { ...cur, ...patch });

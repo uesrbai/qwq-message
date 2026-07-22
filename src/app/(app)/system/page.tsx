@@ -20,8 +20,10 @@ export default async function SystemPage() {
   const view: SysConfigView = {
     appUrl: cfg.appUrl,
     ssoBaseUrl: cfg.ssoBaseUrl,
+    ssoClientId: cfg.ssoClientId,
     ssoDefaultRole: cfg.ssoDefaultRole,
     ssoAllowedEmails: cfg.ssoAllowedEmails,
+    hasClientSecret: cfg.ssoClientSecret.length > 0,
     hasApiKey: cfg.ssoApiKey.length > 0,
     callbackUrl: `${base}/api/auth/sso/callback`,
   };

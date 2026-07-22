@@ -1,13 +1,20 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifySsoToken, ssoPublicBase, baseFromHeaders } from "@/lib/sso";
+import {
+  getSsoOidcConfig,
+  exchangeCodeForToken,
+  fetchOidcUserInfo,
+  ssoCallbackUrl,
+  ssoPublicBase,
+  baseFromHeaders,
+} from "@/lib/sso";
 import { getSystemConfig } from "@/lib/system-config";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/session";
+import { SSO_STATE_COOKIE } from "../start/route";
 
-// SSO 回调：qwq-sso 带 ?token=... 回来，这里校验并建立本地会话
+// SSO 回调（OIDC）：qwq-sso 带 ?code=&state= 回来，换 token → 取用户 → 建会话
 export async function GET(req: NextRequest) {
-  // 部署在代理后面时，跳转地址必须用对外域名（不能用内部的 localhost）
   let base: string;
   try {
     base = await ssoPublicBase(req);
@@ -25,13 +32,25 @@ export async function GET(req: NextRequest) {
 }
 
 async function handleCallback(req: NextRequest, base: string, fail: () => NextResponse) {
-  const token = req.nextUrl.searchParams.get("token");
-  if (!token) return fail();
+  const code = req.nextUrl.searchParams.get("code");
+  const state = req.nextUrl.searchParams.get("state");
+  const savedState = req.cookies.get(SSO_STATE_COOKIE)?.value;
 
-  const ssoUser = await verifySsoToken(token);
-  if (!ssoUser || (ssoUser.status && ssoUser.status !== "active")) return fail();
+  // 防 CSRF：state 必须与发起时一致
+  if (!code || !state || !savedState || state !== savedState) return fail();
 
-  const subject = String(ssoUser.uid_seq ?? ssoUser.id);
+  const cfg = await getSsoOidcConfig();
+  if (!cfg) return fail();
+
+  const redirectUri = ssoCallbackUrl(base);
+  const tokens = await exchangeCodeForToken(cfg, code, redirectUri);
+  if (!tokens?.access_token) return fail();
+
+  const ssoUser = await fetchOidcUserInfo(cfg.root, tokens.access_token);
+  if (!ssoUser) return fail();
+  if (ssoUser.status && ssoUser.status !== "active") return fail();
+
+  const subject = ssoUser.sub;
   const sysCfg = await getSystemConfig();
 
   // 可选邮箱白名单
@@ -62,9 +81,9 @@ async function handleCallback(req: NextRequest, base: string, fail: () => NextRe
   if (!user) {
     let username =
       (ssoUser.email?.split("@")[0] ?? `sso_${subject}`).replace(/[^a-zA-Z0-9_.-]/g, "") ||
-      `sso_${subject}`;
+      `sso_${subject.slice(0, 8)}`;
     if (await prisma.user.findUnique({ where: { username } })) {
-      username = `${username}_${subject}`;
+      username = `${username}_${subject.slice(0, 6)}`;
     }
     user = await prisma.user.create({
       data: {
@@ -93,5 +112,7 @@ async function handleCallback(req: NextRequest, base: string, fail: () => NextRe
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
+  // 清掉一次性的 state
+  res.cookies.set(SSO_STATE_COOKIE, "", { path: "/", maxAge: 0 });
   return res;
 }
