@@ -10,7 +10,12 @@ import {
   baseFromHeaders,
 } from "@/lib/sso";
 import { getSystemConfig } from "@/lib/system-config";
-import { createSessionToken, SESSION_COOKIE } from "@/lib/session";
+import {
+  createSessionToken,
+  SESSION_COOKIE,
+  createSsoPendingToken,
+  SSO_PENDING_COOKIE,
+} from "@/lib/session";
 import { SSO_STATE_COOKIE, SSO_BIND_COOKIE } from "../start/route";
 
 // SSO 回调（OIDC）：换 token → 取用户 → 绑定 或 登录
@@ -87,8 +92,21 @@ async function handleCallback(
     where: { ssoProvider: "qwq-sso", ssoSubject: subject },
   });
   if (!user) {
-    // 未绑定：提示先绑定
-    const res = fail("login", "sso_unbound");
+    // 未绑定：不再直接报错，而是引导用户去绑定页用平台账号登录绑定。
+    // 把 SSO 身份暂存在短期签名令牌里带过去。
+    const pending = await createSsoPendingToken({
+      sub: subject,
+      email: ssoUser.email,
+      name: ssoUser.name,
+    });
+    const res = NextResponse.redirect(`${base}/link-sso`);
+    res.cookies.set(SSO_PENDING_COOKIE, pending, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: 60 * 15,
+    });
     clearSsoCookies(res);
     return res;
   }

@@ -1,49 +1,45 @@
 "use client";
 
 import { useActionState } from "react";
-import { KeyRound } from "lucide-react";
-import { loginAction, type ActionState } from "@/lib/actions/auth";
+import { Link2, ShieldCheck } from "lucide-react";
+import { linkSsoAction, type ActionState } from "@/lib/actions/auth";
 import { useI18n } from "./i18n-provider";
 import { useFormValues } from "./ui/use-form-values";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 placeholder:text-slate-400";
 
-export function LoginForm({
-  next,
-  ssoEnabled,
-  error,
+export function LinkSsoForm({
+  ssoLabel,
+  ssoEmail,
 }: {
-  next: string;
-  ssoEnabled: boolean;
-  error?: string;
+  ssoLabel: string;
+  ssoEmail?: string;
 }) {
   const { dict } = useI18n();
   const t = dict.auth;
+  const l = dict.linkSso;
   const { bind } = useFormValues({ account: "", password: "" });
 
-  const initialError: ActionState = error
-    ? {
-        error:
-          error === "sso_not_configured"
-            ? t.errSsoNotConfigured
-            : error === "sso_unbound"
-              ? t.errSsoUnbound
-              : error === "sso_failed"
-                ? t.errSsoFailed
-                : t.errGeneric,
-      }
-    : undefined;
-
   const [state, action, pending] = useActionState<ActionState, FormData>(
-    loginAction,
-    initialError,
+    linkSsoAction,
+    undefined,
   );
 
   return (
     <div className="space-y-5">
+      <div className="flex items-start gap-3 rounded-lg bg-indigo-50 px-3.5 py-3 text-sm">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600" />
+        <div className="min-w-0">
+          <p className="font-medium text-indigo-900">{l.ssoAccount}</p>
+          <p className="truncate text-indigo-700">{ssoLabel}</p>
+          {ssoEmail && ssoEmail !== ssoLabel && (
+            <p className="truncate text-xs text-indigo-500">{ssoEmail}</p>
+          )}
+        </div>
+      </div>
+
       <form action={action} className="space-y-4">
-        <input type="hidden" name="next" value={next} />
         <div>
           <label className="mb-1.5 block text-sm font-medium text-slate-700">{t.account}</label>
           <input
@@ -75,27 +71,16 @@ export function LoginForm({
           disabled={pending}
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60"
         >
-          <KeyRound className="h-4 w-4" />
-          {pending ? t.loggingIn : t.login}
+          <Link2 className="h-4 w-4" />
+          {pending ? l.binding : l.bindBtn}
         </button>
       </form>
 
-      <div className="flex items-center gap-3 text-xs text-slate-400">
-        <div className="h-px flex-1 bg-slate-200" />
-        {t.or}
-        <div className="h-px flex-1 bg-slate-200" />
-      </div>
-
       <a
-        href={ssoEnabled ? "/api/auth/sso/start" : "/login?error=sso_not_configured"}
-        className={`flex w-full items-center justify-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-semibold transition ${
-          ssoEnabled
-            ? "border-slate-300 text-slate-700 hover:bg-slate-50"
-            : "cursor-not-allowed border-slate-200 text-slate-400"
-        }`}
+        href="/login"
+        className="block text-center text-sm text-slate-500 hover:text-slate-700"
       >
-        {t.ssoLogin}
-        {!ssoEnabled && t.ssoNotConfigured}
+        {l.cancel}
       </a>
     </div>
   );

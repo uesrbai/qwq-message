@@ -3,7 +3,7 @@ import type { NextRequest } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 // 公开路径（无需登录）
-const PUBLIC_PREFIXES = ["/login", "/setup", "/api/v1", "/api/auth"];
+const PUBLIC_PREFIXES = ["/login", "/setup", "/link-sso", "/api/v1", "/api/auth"];
 
 // Next.js 16 把 middleware 改名为 proxy（同样的 API）
 export async function proxy(req: NextRequest) {

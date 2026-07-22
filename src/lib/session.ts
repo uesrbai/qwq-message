@@ -35,3 +35,38 @@ export async function verifySessionToken(
     return null;
   }
 }
+
+// SSO 待绑定：qwq-sso 授权成功但还没绑定平台账号时，
+// 把 sso 身份暂存在这个短期签名令牌里，引导用户去绑定页登录绑定。
+export const SSO_PENDING_COOKIE = "qwq_sso_pending";
+
+export type SsoPending = {
+  sub: string;
+  email?: string;
+  name?: string;
+};
+
+export async function createSsoPendingToken(p: SsoPending): Promise<string> {
+  return await new SignJWT({ email: p.email ?? "", name: p.name ?? "" })
+    .setSubject(p.sub)
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("15m")
+    .sign(secret);
+}
+
+export async function verifySsoPendingToken(
+  token: string,
+): Promise<SsoPending | null> {
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    if (!payload.sub) return null;
+    return {
+      sub: String(payload.sub),
+      email: payload.email ? String(payload.email) : undefined,
+      name: payload.name ? String(payload.name) : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
