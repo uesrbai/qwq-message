@@ -73,6 +73,19 @@ export async function createIamAction(_prev: FormState, fd: FormData): Promise<F
   return { ok: true };
 }
 
+// ---------- 解绑 qwq-sso ----------
+export async function unbindSsoAction() {
+  const user = await requireUser();
+  // 没有本地密码的话解绑会把自己锁在外面，禁止
+  if (!user.passwordHash) return;
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { ssoProvider: null, ssoSubject: null },
+  });
+  await logOperation(user, "iam.update", `${user.username} 解绑 qwq-sso`);
+  revalidatePath("/settings");
+}
+
 // ---------- 修改子账号权限 ----------
 export async function updateIamAction(_prev: FormState, fd: FormData): Promise<FormState> {
   const user = await requireUser();

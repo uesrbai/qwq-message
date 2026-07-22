@@ -25,9 +25,11 @@ export function LoginForm({
         error:
           error === "sso_not_configured"
             ? t.errSsoNotConfigured
-            : error === "sso_failed"
-              ? t.errSsoFailed
-              : t.errGeneric,
+            : error === "sso_unbound"
+              ? t.errSsoUnbound
+              : error === "sso_failed"
+                ? t.errSsoFailed
+                : t.errGeneric,
       }
     : undefined;
 

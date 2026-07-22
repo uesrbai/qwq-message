@@ -11,9 +11,9 @@ import {
 } from "@/lib/sso";
 import { getSystemConfig } from "@/lib/system-config";
 import { createSessionToken, SESSION_COOKIE } from "@/lib/session";
-import { SSO_STATE_COOKIE } from "../start/route";
+import { SSO_STATE_COOKIE, SSO_BIND_COOKIE } from "../start/route";
 
-// SSO 回调（OIDC）：qwq-sso 带 ?code=&state= 回来，换 token → 取用户 → 建会话
+// SSO 回调（OIDC）：换 token → 取用户 → 绑定 或 登录
 export async function GET(req: NextRequest) {
   let base: string;
   try {
@@ -21,7 +21,8 @@ export async function GET(req: NextRequest) {
   } catch {
     base = baseFromHeaders(req);
   }
-  const fail = () => NextResponse.redirect(`${base}/login?error=sso_failed`);
+  const fail = (where = "login", err = "sso_failed") =>
+    NextResponse.redirect(`${base}/${where}?error=${err}`);
 
   try {
     return await handleCallback(req, base, fail);
@@ -31,12 +32,22 @@ export async function GET(req: NextRequest) {
   }
 }
 
-async function handleCallback(req: NextRequest, base: string, fail: () => NextResponse) {
+function clearSsoCookies(res: NextResponse) {
+  res.cookies.set(SSO_STATE_COOKIE, "", { path: "/", maxAge: 0 });
+  res.cookies.set(SSO_BIND_COOKIE, "", { path: "/", maxAge: 0 });
+}
+
+async function handleCallback(
+  req: NextRequest,
+  base: string,
+  fail: (where?: string, err?: string) => NextResponse,
+) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
   const savedState = req.cookies.get(SSO_STATE_COOKIE)?.value;
+  const bindUid = req.cookies.get(SSO_BIND_COOKIE)?.value || "";
 
-  // 防 CSRF：state 必须与发起时一致
+  // 防 CSRF
   if (!code || !state || !savedState || state !== savedState) return fail();
 
   const cfg = await getSsoOidcConfig();
@@ -51,52 +62,48 @@ async function handleCallback(req: NextRequest, base: string, fail: () => NextRe
   if (ssoUser.status && ssoUser.status !== "active") return fail();
 
   const subject = ssoUser.sub;
-  const sysCfg = await getSystemConfig();
+
+  // ============ 绑定流程 ============
+  if (bindUid) {
+    const owner = await prisma.user.findUnique({ where: { id: bindUid } });
+    if (!owner) return fail();
+    // 该 SSO 身份是否已被别人绑走
+    const already = await prisma.user.findFirst({
+      where: { ssoProvider: "qwq-sso", ssoSubject: subject },
+    });
+    if (already && already.id !== bindUid) return fail("settings", "sso_bound_other");
+
+    await prisma.user.update({
+      where: { id: bindUid },
+      data: { ssoProvider: "qwq-sso", ssoSubject: subject },
+    });
+    const res = NextResponse.redirect(`${base}/settings?bound=1`);
+    clearSsoCookies(res);
+    return res;
+  }
+
+  // ============ 登录流程（只认已绑定账号，不自动建号）============
+  const user = await prisma.user.findFirst({
+    where: { ssoProvider: "qwq-sso", ssoSubject: subject },
+  });
+  if (!user) {
+    // 未绑定：提示先绑定
+    const res = fail("login", "sso_unbound");
+    clearSsoCookies(res);
+    return res;
+  }
 
   // 可选邮箱白名单
+  const sysCfg = await getSystemConfig();
   const allow = sysCfg.ssoAllowedEmails
     .split(/[,，\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  if (allow.length && ssoUser.email && !allow.includes(ssoUser.email)) return fail();
-
-  const email = ssoUser.email ?? `${subject}@sso.local`;
-  const displayName = ssoUser.name ?? email;
-
-  // 1) 先按 SSO 主体找；2) 再按邮箱关联；3) 否则新建
-  let user = await prisma.user.findFirst({
-    where: { ssoProvider: "qwq-sso", ssoSubject: subject },
-  });
-
-  if (!user && ssoUser.email) {
-    const byEmail = await prisma.user.findUnique({ where: { email: ssoUser.email } });
-    if (byEmail) {
-      user = await prisma.user.update({
-        where: { id: byEmail.id },
-        data: { ssoProvider: "qwq-sso", ssoSubject: subject },
-      });
-    }
+  if (allow.length && ssoUser.email && !allow.includes(ssoUser.email)) {
+    const res = fail("login", "sso_failed");
+    clearSsoCookies(res);
+    return res;
   }
-
-  if (!user) {
-    let username =
-      (ssoUser.email?.split("@")[0] ?? `sso_${subject}`).replace(/[^a-zA-Z0-9_.-]/g, "") ||
-      `sso_${subject.slice(0, 8)}`;
-    if (await prisma.user.findUnique({ where: { username } })) {
-      username = `${username}_${subject.slice(0, 6)}`;
-    }
-    user = await prisma.user.create({
-      data: {
-        email,
-        username,
-        displayName,
-        role: sysCfg.ssoDefaultRole || "ADMIN",
-        ssoProvider: "qwq-sso",
-        ssoSubject: subject,
-      },
-    });
-  }
-
   if (user.status !== "ACTIVE") return fail();
 
   const sessionToken = await createSessionToken({
@@ -112,7 +119,6 @@ async function handleCallback(req: NextRequest, base: string, fail: () => NextRe
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
-  // 清掉一次性的 state
-  res.cookies.set(SSO_STATE_COOKIE, "", { path: "/", maxAge: 0 });
+  clearSsoCookies(res);
   return res;
 }

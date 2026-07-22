@@ -54,6 +54,7 @@ const zh = {
     errDisabled: "该账号已被停用",
     errSsoNotConfigured: "qwq-sso 尚未配置，请先在环境变量中填写",
     errSsoFailed: "qwq-sso 登录失败，请重试或使用账号密码登录",
+    errSsoUnbound: "此 qwq-sso 账号尚未绑定本系统账号。请先用账号密码登录，再到「用户设置」里绑定。",
     errGeneric: "登录出现问题，请重试",
   },
   dashboard: {
@@ -310,6 +311,12 @@ const zh = {
   settings: {
     changePassword: "修改密码",
     changePasswordHint: "SSO 登录的用户也可在此设置本地登录密码。",
+    ssoBindTitle: "qwq-sso 单点登录",
+    ssoBindHint: "绑定后即可用 qwq-sso 账号一键登录本系统（首次使用请先在此绑定）。",
+    ssoBound: "已绑定 qwq-sso",
+    ssoUnbind: "解绑",
+    ssoBindBtn: "绑定 qwq-sso",
+    ssoBoundOk: "绑定成功！以后可用 qwq-sso 直接登录。",
     currentPassword: "当前密码",
     newPassword: "新密码",
     confirmPassword: "确认新密码",
@@ -471,6 +478,7 @@ const en: Dictionary = {
     errDisabled: "This account has been disabled",
     errSsoNotConfigured: "qwq-sso is not configured yet. Please set it in your environment variables.",
     errSsoFailed: "qwq-sso sign-in failed. Please try again or use your password.",
+    errSsoUnbound: "This qwq-sso account is not linked yet. Sign in with your password first, then bind it under Settings.",
     errGeneric: "Something went wrong signing in. Please try again.",
   },
   dashboard: {
@@ -727,6 +735,12 @@ const en: Dictionary = {
   settings: {
     changePassword: "Change password",
     changePasswordHint: "SSO users can also set a local password here.",
+    ssoBindTitle: "qwq-sso Single Sign-On",
+    ssoBindHint: "Bind your qwq-sso account to sign in with one click (first-time users bind here first).",
+    ssoBound: "qwq-sso bound",
+    ssoUnbind: "Unbind",
+    ssoBindBtn: "Bind qwq-sso",
+    ssoBoundOk: "Bound! You can now sign in with qwq-sso.",
     currentPassword: "Current password",
     newPassword: "New password",
     confirmPassword: "Confirm new password",
