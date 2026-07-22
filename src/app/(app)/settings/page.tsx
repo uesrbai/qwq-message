@@ -10,7 +10,7 @@ import { IamManager, type IamDTO } from "@/components/settings/iam-manager";
 export default async function SettingsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bound?: string }>;
+  searchParams: Promise<{ bound?: string; error?: string }>;
 }) {
   const user = await requireUser();
   const { dict } = await getI18n();
@@ -39,7 +39,12 @@ export default async function SettingsPage({
       <PageHeader title={p.title} description={p.desc} />
       <div className="space-y-6">
         <ChangePassword hasPassword={!!user.passwordHash} />
-        <SsoBind bound={!!user.ssoSubject} ssoEnabled={ssoOn} justBound={sp.bound === "1"} />
+        <SsoBind
+          bound={!!user.ssoSubject}
+          ssoEnabled={ssoOn}
+          justBound={sp.bound === "1"}
+          errorCode={sp.error}
+        />
         {isManager && <IamManager accounts={accounts} />}
       </div>
     </>

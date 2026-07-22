@@ -26,14 +26,19 @@ export async function GET(req: NextRequest) {
   } catch {
     base = baseFromHeaders(req);
   }
-  const fail = (where = "login", err = "sso_failed") =>
-    NextResponse.redirect(`${base}/${where}?error=${err}`);
+  // 失败一律回登录页并带上细分错误码，同时清掉登录态，保证错误能被看到
+  const fail = (err = "sso_failed") => {
+    const res = NextResponse.redirect(`${base}/login?error=${err}`);
+    res.cookies.set(SESSION_COOKIE, "", { path: "/", maxAge: 0 });
+    clearSsoCookies(res);
+    return res;
+  };
 
   try {
     return await handleCallback(req, base, fail);
   } catch (e) {
     console.error("[sso/callback] error:", e);
-    return fail();
+    return fail("sso_exception");
   }
 }
 
@@ -45,38 +50,44 @@ function clearSsoCookies(res: NextResponse) {
 async function handleCallback(
   req: NextRequest,
   base: string,
-  fail: (where?: string, err?: string) => NextResponse,
+  fail: (err?: string) => NextResponse,
 ) {
   const code = req.nextUrl.searchParams.get("code");
   const state = req.nextUrl.searchParams.get("state");
+  const oauthErr = req.nextUrl.searchParams.get("error");
   const savedState = req.cookies.get(SSO_STATE_COOKIE)?.value;
   const bindUid = req.cookies.get(SSO_BIND_COOKIE)?.value || "";
 
-  // 防 CSRF
-  if (!code || !state || !savedState || state !== savedState) return fail();
+  // qwq-sso 直接带回的错误（如用户拒绝授权、client 配置问题）
+  if (oauthErr) return fail(`sso_oauth_${oauthErr}`);
+  if (!code || !state) return fail("sso_nocode");
+  if (!savedState) return fail("sso_nostate"); // state cookie 丢了（跨站 cookie 未回传）
+  if (state !== savedState) return fail("sso_badstate");
 
   const cfg = await getSsoOidcConfig();
-  if (!cfg) return fail();
+  if (!cfg) return fail("sso_nocfg");
 
   const redirectUri = ssoCallbackUrl(base);
   const tokens = await exchangeCodeForToken(cfg, code, redirectUri);
-  if (!tokens?.access_token) return fail();
+  if (!tokens?.access_token) return fail("sso_token");
 
   const ssoUser = await fetchOidcUserInfo(cfg.root, tokens.access_token);
-  if (!ssoUser) return fail();
-  if (ssoUser.status && ssoUser.status !== "active") return fail();
+  if (!ssoUser) return fail("sso_userinfo");
+  if (ssoUser.status && ssoUser.status !== "active") return fail("sso_inactive");
 
   const subject = ssoUser.sub;
 
   // ============ 绑定流程 ============
   if (bindUid) {
     const owner = await prisma.user.findUnique({ where: { id: bindUid } });
-    if (!owner) return fail();
+    if (!owner) return fail("sso_owner_missing");
     // 该 SSO 身份是否已被别人绑走
     const already = await prisma.user.findFirst({
       where: { ssoProvider: "qwq-sso", ssoSubject: subject },
     });
-    if (already && already.id !== bindUid) return fail("settings", "sso_bound_other");
+    if (already && already.id !== bindUid) {
+      return NextResponse.redirect(`${base}/settings?error=sso_bound_other`);
+    }
 
     await prisma.user.update({
       where: { id: bindUid },
@@ -118,11 +129,9 @@ async function handleCallback(
     .map((s) => s.trim())
     .filter(Boolean);
   if (allow.length && ssoUser.email && !allow.includes(ssoUser.email)) {
-    const res = fail("login", "sso_failed");
-    clearSsoCookies(res);
-    return res;
+    return fail("sso_email_denied");
   }
-  if (user.status !== "ACTIVE") return fail();
+  if (user.status !== "ACTIVE") return fail("sso_disabled");
 
   const sessionToken = await createSessionToken({
     uid: user.id,

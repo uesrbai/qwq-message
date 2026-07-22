@@ -31,7 +31,9 @@ export function LoginForm({
               ? t.errSsoUnbound
               : error === "sso_failed"
                 ? t.errSsoFailed
-                : t.errGeneric,
+                : error.startsWith("sso_")
+                  ? `${t.errSsoFailed}（${error}）`
+                  : t.errGeneric,
       }
     : undefined;
 
