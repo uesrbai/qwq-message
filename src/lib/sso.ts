@@ -18,7 +18,9 @@ export type SsoUser = {
 export async function getSsoConfig() {
   const { ssoBaseUrl, ssoApiKey } = await getSystemConfig();
   if (!ssoBaseUrl || !ssoApiKey) return null;
-  const root = ssoBaseUrl.replace(/\/+$/, "").replace(/\/api\/v\d+$/i, "");
+  let root = ssoBaseUrl.trim().replace(/\/+$/, "").replace(/\/api\/v\d+$/i, "");
+  // 用户常忘填协议头，自动补 https://，否则拼出的跳转地址无效
+  if (!/^https?:\/\//i.test(root)) root = `https://${root}`;
   return { root, apiBase: `${root}/api/v1`, apiKey: ssoApiKey };
 }
 
@@ -38,8 +40,11 @@ type ReqLike = { headers: Headers; nextUrl: { origin: string; host: string } };
  */
 export async function ssoPublicBase(req: ReqLike): Promise<string> {
   const { appUrl } = await getSystemConfig();
-  const configured = appUrl.trim().replace(/\/+$/, "");
-  if (configured) return configured;
+  let configured = appUrl.trim().replace(/\/+$/, "");
+  if (configured) {
+    if (!/^https?:\/\//i.test(configured)) configured = `https://${configured}`;
+    return configured;
+  }
   return baseFromHeaders(req);
 }
 
