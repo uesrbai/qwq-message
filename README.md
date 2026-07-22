@@ -42,6 +42,9 @@ npm run dev
 
 ## API 调用
 
+> 📘 **完整对接文档见 [API.md](./API.md)** —— 含所有接口、各渠道参数、错误码、限速、容灾说明与多语言示例。下面是速览。
+
+
 **接口**：`POST /api/v1/send`
 **鉴权**：请求头 `Authorization: Bearer <你的密钥>`
 
