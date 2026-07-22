@@ -1,9 +1,14 @@
 import { headers } from "next/headers";
+import { prisma } from "@/lib/db";
 import { getI18n } from "@/lib/i18n/server";
 import { requireFeature } from "@/lib/auth";
 import { getSystemConfig } from "@/lib/system-config";
 import { PageHeader } from "@/components/page-header";
 import { SystemSettingsForm, type SysConfigView } from "@/components/system/system-settings-form";
+import {
+  SsoBindingsAdmin,
+  type SsoBindingRow,
+} from "@/components/system/sso-bindings-admin";
 
 export default async function SystemPage() {
   await requireFeature("system");
@@ -28,10 +33,28 @@ export default async function SystemPage() {
     callbackUrl: `${base}/api/auth/sso/callback`,
   };
 
+  const bindings: SsoBindingRow[] = (
+    await prisma.user.findMany({
+      where: { ssoSubject: { not: null } },
+      orderBy: { createdAt: "asc" },
+    })
+  ).map((u) => ({
+    id: u.id,
+    username: u.username,
+    displayName: u.displayName,
+    email: u.email,
+    role: u.role,
+    ssoSubject: u.ssoSubject ?? "",
+    hasPassword: !!u.passwordHash,
+  }));
+
   return (
     <>
       <PageHeader title={p.title} description={p.desc} />
-      <SystemSettingsForm config={view} />
+      <div className="space-y-6">
+        <SystemSettingsForm config={view} />
+        <SsoBindingsAdmin rows={bindings} />
+      </div>
     </>
   );
 }

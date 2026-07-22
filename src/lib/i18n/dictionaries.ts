@@ -389,6 +389,14 @@ const zh = {
     saving: "保存中…",
     saved: "已保存，立即生效",
     errNoPermission: "没有权限执行此操作",
+    ssoBindings: {
+      title: "qwq-sso 绑定管理",
+      desc: "这里列出所有已绑定 qwq-sso 的账号。若某个 SSO 身份错绑到了不该绑的账号（例如旧版自动创建的空账号），在此解绑即可释放，之后就能用正确的账号重新绑定。",
+      empty: "目前没有任何账号绑定 qwq-sso",
+      shadowTag: "疑似影子账号",
+      unbind: "解绑",
+      deleteUser: "删除该账号",
+    },
   },
   logs: {
     callsTitle: "最近调用记录",
@@ -824,6 +832,14 @@ const en: Dictionary = {
     saving: "Saving…",
     saved: "Saved — effective immediately",
     errNoPermission: "You do not have permission",
+    ssoBindings: {
+      title: "qwq-sso binding management",
+      desc: "All accounts currently linked to qwq-sso are listed here. If an SSO identity is linked to the wrong account (e.g. an empty account auto-created by an older version), unbind it here to free it, then re-link the correct account.",
+      empty: "No accounts are linked to qwq-sso",
+      shadowTag: "Likely shadow account",
+      unbind: "Unbind",
+      deleteUser: "Delete account",
+    },
   },
   logs: {
     callsTitle: "Recent calls",

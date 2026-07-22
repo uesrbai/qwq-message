@@ -7,7 +7,7 @@ import { logOperation } from "@/lib/audit";
 import { hashPassword, verifyPassword } from "@/lib/hash";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n/dictionaries";
-import { IAM_FEATURES } from "@/lib/permissions";
+import { IAM_FEATURES, canAccessFeature } from "@/lib/permissions";
 import { METHOD_KEYS, type MethodKey } from "@/lib/constants";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
@@ -84,6 +84,37 @@ export async function unbindSsoAction() {
   });
   await logOperation(user, "iam.update", `${user.username} 解绑 qwq-sso`);
   revalidatePath("/settings");
+}
+
+// ---------- 管理员：解绑任意账号的 qwq-sso（清理影子/错绑账号）----------
+export async function adminUnbindSsoAction(fd: FormData) {
+  const user = await requireUser();
+  // 仅系统设置权限（OWNER/ADMIN）可操作
+  if (!canAccessFeature(user, "system")) return;
+  const id = String(fd.get("id") ?? "");
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target || !target.ssoSubject) return;
+  await prisma.user.update({
+    where: { id },
+    data: { ssoProvider: null, ssoSubject: null },
+  });
+  await logOperation(user, "iam.update", `${target.username} 解绑 qwq-sso（管理员）`);
+  revalidatePath("/system");
+}
+
+// ---------- 管理员：删除影子账号（无密码、只靠 SSO 的空账号）----------
+export async function adminDeleteSsoUserAction(fd: FormData) {
+  const user = await requireUser();
+  if (!canAccessFeature(user, "system")) return;
+  const id = String(fd.get("id") ?? "");
+  if (id === user.id) return; // 不能删自己
+  const target = await prisma.user.findUnique({ where: { id } });
+  if (!target) return;
+  // 只允许删「靠 SSO 建出来、且不是拥有者」的账号，避免误删真人账号
+  if (target.role === "OWNER") return;
+  await prisma.user.delete({ where: { id } });
+  await logOperation(user, "iam.delete", `${target.username}（SSO 影子账号）`);
+  revalidatePath("/system");
 }
 
 // ---------- 修改子账号权限 ----------
