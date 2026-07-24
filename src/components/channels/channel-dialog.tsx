@@ -1,16 +1,21 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import { Search, Copy, Check, Loader2 } from "lucide-react";
 import {
   createChannelAction,
   updateChannelAction,
+  queryVolcTemplatesAction,
   type FormState,
+  type VolcTemplateQuery,
 } from "@/lib/actions/channels";
 import { useI18n } from "../i18n-provider";
 import { Modal } from "../ui/modal";
 import { Field, inputCls, selectCls } from "../ui/field";
 import { useFormValues } from "../ui/use-form-values";
 import { PROVIDERS, PROVIDER_FIELDS, pick, type MethodKey } from "@/lib/constants";
+
+type VolcTpl = NonNullable<VolcTemplateQuery["templates"]>[number];
 
 type ChannelEdit = {
   id: string;
@@ -53,6 +58,46 @@ export function ChannelDialog({
   });
   // 各服务商的参数值（受控，报错不丢）
   const [cfg, setCfg] = useState<Record<string, string>>(() => parseConfig(edit?.config));
+
+  // 火山「二级模板（子模板）」查询状态
+  const [vtLoading, setVtLoading] = useState(false);
+  const [vtErr, setVtErr] = useState("");
+  const [vtList, setVtList] = useState<VolcTpl[] | null>(null);
+  const [copiedId, setCopiedId] = useState("");
+
+  async function loadVolcTemplates() {
+    setVtLoading(true);
+    setVtErr("");
+    try {
+      const r = await queryVolcTemplatesAction({
+        channelId: edit?.id,
+        accessKeyId: cfg.accessKeyId,
+        secretAccessKey: cfg.secretAccessKey,
+        region: cfg.region,
+      });
+      if (!r.ok) {
+        setVtErr(r.error || c.volcQueryFailed);
+        setVtList(null);
+      } else {
+        setVtList(r.templates ?? []);
+      }
+    } catch {
+      setVtErr(c.volcQueryFailed);
+      setVtList(null);
+    } finally {
+      setVtLoading(false);
+    }
+  }
+
+  async function copyId(id: string) {
+    try {
+      await navigator.clipboard.writeText(id);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId((cur) => (cur === id ? "" : cur)), 1500);
+    } catch {
+      /* 剪贴板不可用时忽略 */
+    }
+  }
 
   const [state, formAction, pending] = useActionState<FormState, FormData>(
     edit ? updateChannelAction : createChannelAction,
@@ -142,6 +187,68 @@ export function ChannelDialog({
             </Field>
           );
         })}
+
+        {provider === "VOLC" && (
+          <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs text-slate-500">{c.volcQueryHint}</div>
+              <button
+                type="button"
+                onClick={loadVolcTemplates}
+                disabled={vtLoading || !cfg.accessKeyId}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 disabled:opacity-50"
+              >
+                {vtLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Search className="h-3.5 w-3.5" />}
+                {vtLoading ? c.volcQuerying : c.volcQueryBtn}
+              </button>
+            </div>
+
+            {vtErr && <p className="mt-2 text-xs text-red-600">{vtErr}</p>}
+
+            {vtList && vtList.length === 0 && !vtErr && (
+              <p className="mt-2 text-xs text-slate-400">{c.volcNoTemplates}</p>
+            )}
+
+            {vtList && vtList.length > 0 && (
+              <div className="mt-2 max-h-64 space-y-2 overflow-y-auto">
+                {vtList.map((tpl) => (
+                  <div key={tpl.secondTemplateId || tpl.templateId} className="rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="flex items-center gap-2">
+                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
+                        {tpl.secondTemplateId}
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => copyId(tpl.secondTemplateId)}
+                        title={c.volcCopyId}
+                        className="inline-flex items-center gap-1 rounded border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-500 hover:bg-slate-50"
+                      >
+                        {copiedId === tpl.secondTemplateId ? (
+                          <><Check className="h-3 w-3 text-emerald-600" />{c.volcCopied}</>
+                        ) : (
+                          <><Copy className="h-3 w-3" />{c.volcCopyId}</>
+                        )}
+                      </button>
+                      <span
+                        className={`ml-auto rounded px-1.5 py-0.5 text-[11px] ${
+                          tpl.approved ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
+                        }`}
+                      >
+                        {tpl.approved ? c.volcApproved : `${c.volcNotApproved}(${tpl.reviewStatus})`}
+                      </span>
+                    </div>
+                    <p className="mt-1.5 line-clamp-2 text-xs text-slate-600">{tpl.content}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
+                      {tpl.sign && <span>签名: {tpl.sign}</span>}
+                      {tpl.channelType && <span>{tpl.channelType}</span>}
+                      {tpl.variables.length > 0 && <span>变量: {tpl.variables.join(", ")}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {state?.error && (
           <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{state.error}</p>

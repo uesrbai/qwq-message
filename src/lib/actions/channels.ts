@@ -8,8 +8,52 @@ import { canUseMethod, canAccessFeature } from "@/lib/permissions";
 import { getLocale } from "@/lib/i18n/server";
 import { getDictionary } from "@/lib/i18n/dictionaries";
 import { METHOD_KEYS, PROVIDER_FIELDS, type MethodKey } from "@/lib/constants";
+import { listVolcSecondTemplates, type VolcSecondTemplate } from "@/lib/dispatch/providers/volc-sms";
 
 export type FormState = { ok?: boolean; error?: string } | undefined;
+
+export type VolcTemplateQuery = {
+  ok: boolean;
+  error?: string;
+  templates?: VolcSecondTemplate[];
+};
+
+/** 火山引擎「二级模板（子模板）」查询：优先用传入凭证，缺失则回落已保存渠道 */
+export async function queryVolcTemplatesAction(input: {
+  channelId?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  region?: string;
+}): Promise<VolcTemplateQuery> {
+  const user = await requireUser();
+  const t = getDictionary(await getLocale()).channels;
+  if (!canAccessFeature(user, "channels") || !canUseMethod(user, "SMS")) {
+    return { ok: false, error: t.errNoPermission };
+  }
+
+  let creds = {
+    accessKeyId: (input.accessKeyId ?? "").trim(),
+    secretAccessKey: (input.secretAccessKey ?? "").trim(),
+    region: (input.region ?? "").trim() || undefined,
+  };
+  // 表单没填全（如编辑时密钥被隐藏）→ 回落到已保存渠道的凭证
+  if ((!creds.accessKeyId || !creds.secretAccessKey) && input.channelId) {
+    const ch = await prisma.channel.findUnique({ where: { id: input.channelId } });
+    if (ch?.provider === "VOLC") {
+      try {
+        const saved = JSON.parse(ch.config || "{}") as Record<string, string>;
+        creds = {
+          accessKeyId: saved.accessKeyId ?? "",
+          secretAccessKey: saved.secretAccessKey ?? "",
+          region: saved.region || undefined,
+        };
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+  return listVolcSecondTemplates(creds);
+}
 
 function str(fd: FormData, k: string) {
   return String(fd.get(k) ?? "").trim();
