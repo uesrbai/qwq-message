@@ -214,21 +214,23 @@ export function ChannelDialog({
                 {vtList.map((tpl) => (
                   <div key={tpl.secondTemplateId || tpl.templateId} className="rounded-lg border border-slate-200 bg-white p-2.5">
                     <div className="flex items-center gap-2">
-                      <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-700">
-                        {tpl.secondTemplateId}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() => copyId(tpl.secondTemplateId)}
-                        title={c.volcCopyId}
-                        className="inline-flex items-center gap-1 rounded border border-slate-200 px-1.5 py-0.5 text-[11px] text-slate-500 hover:bg-slate-50"
-                      >
-                        {copiedId === tpl.secondTemplateId ? (
-                          <><Check className="h-3 w-3 text-emerald-600" />{c.volcCopied}</>
-                        ) : (
-                          <><Copy className="h-3 w-3" />{c.volcCopyId}</>
-                        )}
-                      </button>
+                      <span className="text-[11px] text-slate-400">{c.volcIdLabel}</span>
+                      {[tpl.numericId, tpl.secondTemplateId].filter(Boolean).map((id) => (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => copyId(id)}
+                          title={c.volcCopyId}
+                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
+                        >
+                          <code>{id}</code>
+                          {copiedId === id ? (
+                            <Check className="h-3 w-3 text-emerald-600" />
+                          ) : (
+                            <Copy className="h-3 w-3 text-slate-400" />
+                          )}
+                        </button>
+                      ))}
                       <span
                         className={`ml-auto rounded px-1.5 py-0.5 text-[11px] ${
                           tpl.approved ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"
@@ -239,7 +241,12 @@ export function ChannelDialog({
                     </div>
                     <p className="mt-1.5 line-clamp-2 text-xs text-slate-600">{tpl.content}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
-                      {tpl.sign && <span>签名: {tpl.sign}</span>}
+                      {tpl.sign && (
+                        <span className="font-medium text-slate-500">
+                          {c.volcSignLabel}
+                          <code className="text-indigo-600">{tpl.sign}</code>
+                        </span>
+                      )}
                       {tpl.channelType && <span>{tpl.channelType}</span>}
                       {tpl.variables.length > 0 && <span>变量: {tpl.variables.join(", ")}</span>}
                     </div>

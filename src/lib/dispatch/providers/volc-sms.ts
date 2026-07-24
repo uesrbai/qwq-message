@@ -59,7 +59,8 @@ async function volcRequest(
 }
 
 export type VolcSecondTemplate = {
-  secondTemplateId: string; // 二级模板ID（S2T_...，发送时用的 TemplateID）
+  numericId: string; // 纯数字模板ID（旧版 SendSms TemplateID 格式，很可能就是发送用的）
+  secondTemplateId: string; // 二级模板ID（S2T_...）
   templateId: string; // 一级模板ID（S1T_...）
   sign: string; // 签名
   content: string; // 正文
@@ -111,6 +112,7 @@ export async function listVolcSecondTemplates(
       variables = Array.from(new Set(variables));
       const reviewStatus = Number(pick(o, ["reviewStatus", "ReviewStatus", "status", "Status"]) || "0");
       return {
+        numericId: pick(o, ["id", "Id", "ID"]),
         secondTemplateId: pick(o, ["secondTemplateId", "SecondTemplateId"]),
         templateId: pick(o, ["templateId", "TemplateId"]),
         sign: pick(o, ["signature", "Signature", "sign", "Sign"]),
