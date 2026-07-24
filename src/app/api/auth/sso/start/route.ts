@@ -38,16 +38,19 @@ export async function GET(req: NextRequest) {
 
     const res = NextResponse.redirect(url);
     const secure = process.env.NODE_ENV === "production";
+    // 跨站回跳(qwqsso→本站)时，SameSite=Lax 在部分浏览器/代理下不稳，state cookie 丢失会报 sso_nostate。
+    // 生产用 None+Secure 确保回跳时一定带上；本地(http)退回 lax（None 必须配 Secure，否则被浏览器拒）。
+    const sameSite = secure ? "none" : "lax";
     res.cookies.set(SSO_STATE_COOKIE, state, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite,
       secure,
       path: "/",
       maxAge: 600,
     });
     res.cookies.set(SSO_BIND_COOKIE, bindUid, {
       httpOnly: true,
-      sameSite: "lax",
+      sameSite,
       secure,
       path: "/",
       maxAge: bindUid ? 600 : 0,
