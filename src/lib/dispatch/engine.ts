@@ -37,7 +37,13 @@ export async function sendViaChannel(
   }
 
   const started = Date.now();
-  const result = await runSender(channel.provider, config, payload);
+  // 兜底：任何渠道实现里未预料的异常都转成干净的失败结果，绝不让它冒泡成 500
+  let result: SendResult;
+  try {
+    result = await runSender(channel.provider, config, payload);
+  } catch (e) {
+    result = { ok: false, error: e instanceof Error ? e.message : "渠道发送异常 / sender crashed" };
+  }
   const latencyMs = Date.now() - started;
   const method = methodOfProvider(channel.provider) ?? "WEBHOOK";
 
