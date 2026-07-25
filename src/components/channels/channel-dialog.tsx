@@ -214,23 +214,20 @@ export function ChannelDialog({
                 {vtList.map((tpl) => (
                   <div key={tpl.secondTemplateId || tpl.templateId} className="rounded-lg border border-slate-200 bg-white p-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-400">{c.volcIdLabel}</span>
-                      {[tpl.numericId, tpl.secondTemplateId].filter(Boolean).map((id) => (
-                        <button
-                          key={id}
-                          type="button"
-                          onClick={() => copyId(id)}
-                          title={c.volcCopyId}
-                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-100"
-                        >
-                          <code>{id}</code>
-                          {copiedId === id ? (
-                            <Check className="h-3 w-3 text-emerald-600" />
-                          ) : (
-                            <Copy className="h-3 w-3 text-slate-400" />
-                          )}
-                        </button>
-                      ))}
+                      <span className="text-[11px] font-medium text-slate-500">{c.volcIdLabel}</span>
+                      <button
+                        type="button"
+                        onClick={() => copyId(tpl.templateId)}
+                        title={c.volcCopyId}
+                        className="inline-flex items-center gap-1 rounded border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
+                      >
+                        <code>{tpl.templateId}</code>
+                        {copiedId === tpl.templateId ? (
+                          <Check className="h-3 w-3 text-emerald-600" />
+                        ) : (
+                          <Copy className="h-3 w-3 text-indigo-400" />
+                        )}
+                      </button>
                       <span
                         className={`ml-auto rounded px-1.5 py-0.5 text-[11px] ${
                           tpl.approved ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"

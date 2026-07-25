@@ -202,8 +202,8 @@ const zh = {
     volcCopied: "已复制",
     volcApproved: "已通过",
     volcNotApproved: "审核中/未通过",
-    volcIdLabel: "模板ID(点击复制)：",
-    volcSignLabel: "签名: ",
+    volcIdLabel: "发送用模板ID(一级/S1T，点击复制)：",
+    volcSignLabel: "签名(须与渠道一致): ",
   },
   test: {
     selectChannel: "选择渠道",
@@ -658,8 +658,8 @@ const en: Dictionary = {
     volcCopied: "Copied",
     volcApproved: "Approved",
     volcNotApproved: "Pending/Rejected",
-    volcIdLabel: "Template ID (click to copy):",
-    volcSignLabel: "Sign: ",
+    volcIdLabel: "Send template ID (level-1/S1T, click to copy):",
+    volcSignLabel: "Sign (must match channel): ",
   },
   test: {
     selectChannel: "Select channel",
