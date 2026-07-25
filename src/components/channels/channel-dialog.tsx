@@ -98,7 +98,7 @@ export function ChannelDialog({
           content: t.content,
           variables: t.variables,
         }));
-      const r = await importVolcTemplatesAction(items);
+      const r = await importVolcTemplatesAction(items, groupId);
       if (!r.ok) {
         setImportMsg(r.error || c.importNone);
       } else {

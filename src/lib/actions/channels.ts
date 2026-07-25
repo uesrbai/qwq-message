@@ -69,12 +69,19 @@ export type ImportTemplateInput = {
 
 export type ImportResult = { ok: boolean; error?: string; created?: number; skipped?: number };
 
-/** 把火山查询到的模板一键添加为平台 SMS 模板 */
-export async function importVolcTemplatesAction(items: ImportTemplateInput[]): Promise<ImportResult> {
+/** 把火山查询到的模板一键添加为平台 SMS 模板，并绑定到该渠道所在分组 */
+export async function importVolcTemplatesAction(
+  items: ImportTemplateInput[],
+  groupId: string,
+): Promise<ImportResult> {
   const user = await requireUser();
   const t = getDictionary(await getLocale()).channels;
   if (!canAccessFeature(user, "templates")) return { ok: false, error: t.importNoPerm };
   if (!Array.isArray(items) || items.length === 0) return { ok: false, error: t.importNone };
+
+  // 必须绑定到该渠道所在的分组，避免多账号时发送兜底选错分组/账号
+  const group = groupId ? await prisma.channelGroup.findUnique({ where: { id: groupId } }) : null;
+  if (!group || group.method !== "SMS") return { ok: false, error: t.importNoGroup };
 
   let created = 0;
   let skipped = 0;
@@ -84,8 +91,10 @@ export async function importVolcTemplatesAction(items: ImportTemplateInput[]): P
       skipped++;
       continue;
     }
-    // 已按同一个服务商模板ID导入过 → 跳过，避免重复
-    const dup = await prisma.template.findFirst({ where: { providerTemplateId } });
+    // 同一分组内、同一个服务商模板ID只导一次（不同分组/账号可各自导入）
+    const dup = await prisma.template.findFirst({
+      where: { providerTemplateId, groupId: group.id },
+    });
     if (dup) {
       skipped++;
       continue;
@@ -105,6 +114,7 @@ export async function importVolcTemplatesAction(items: ImportTemplateInput[]): P
         code,
         name,
         method: "SMS",
+        groupId: group.id, // 绑定到该火山渠道所在分组
         content,
         signName: (it.sign || "").trim() || null,
         providerTemplateId,
@@ -115,7 +125,7 @@ export async function importVolcTemplatesAction(items: ImportTemplateInput[]): P
     created++;
   }
 
-  await logOperation(user, "template.create", `火山导入 ${created} 个模板`);
+  await logOperation(user, "template.create", `火山导入 ${created} 个模板 → 分组 ${group.code}`);
   revalidatePath("/templates");
   return { ok: true, created, skipped };
 }

@@ -209,7 +209,8 @@ const zh = {
     importing: "添加中…",
     importNoPerm: "没有模板管理权限，无法添加",
     importNone: "请先勾选要添加的模板",
-    importDone: "已添加 {created} 个，跳过 {skipped} 个(已存在)",
+    importNoGroup: "无法确定所属分组，请在具体的短信分组下添加渠道后再导入",
+    importDone: "已添加 {created} 个到本分组，跳过 {skipped} 个(已存在)",
   },
   test: {
     selectChannel: "选择渠道",
@@ -671,7 +672,8 @@ const en: Dictionary = {
     importing: "Adding…",
     importNoPerm: "No template-management permission",
     importNone: "Select templates to add first",
-    importDone: "Added {created}, skipped {skipped} (already exist)",
+    importNoGroup: "Cannot determine the group; add the channel under a specific SMS group first",
+    importDone: "Added {created} to this group, skipped {skipped} (already exist)",
   },
   test: {
     selectChannel: "Select channel",
