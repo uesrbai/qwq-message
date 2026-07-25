@@ -1,11 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search, Copy, Check, Loader2 } from "lucide-react";
+import { Search, Copy, Check, Loader2, Plus } from "lucide-react";
 import {
   createChannelAction,
   updateChannelAction,
   queryVolcTemplatesAction,
+  importVolcTemplatesAction,
   type FormState,
   type VolcTemplateQuery,
 } from "@/lib/actions/channels";
@@ -64,6 +65,54 @@ export function ChannelDialog({
   const [vtErr, setVtErr] = useState("");
   const [vtList, setVtList] = useState<VolcTpl[] | null>(null);
   const [copiedId, setCopiedId] = useState("");
+  // 勾选导入
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState("");
+
+  function toggleSel(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+  function toggleAll() {
+    const ids = (vtList ?? []).map((t) => t.templateId).filter(Boolean);
+    setSelected((prev) => (prev.size === ids.length ? new Set() : new Set(ids)));
+  }
+  async function importSelected() {
+    if (selected.size === 0) {
+      setImportMsg(c.importNone);
+      return;
+    }
+    setImporting(true);
+    setImportMsg("");
+    try {
+      const items = (vtList ?? [])
+        .filter((t) => selected.has(t.templateId))
+        .map((t) => ({
+          templateId: t.templateId,
+          sign: t.sign,
+          content: t.content,
+          variables: t.variables,
+        }));
+      const r = await importVolcTemplatesAction(items);
+      if (!r.ok) {
+        setImportMsg(r.error || c.importNone);
+      } else {
+        setImportMsg(
+          c.importDone
+            .replace("{created}", String(r.created ?? 0))
+            .replace("{skipped}", String(r.skipped ?? 0)),
+        );
+        setSelected(new Set());
+      }
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function loadVolcTemplates() {
     setVtLoading(true);
@@ -214,6 +263,13 @@ export function ChannelDialog({
                 {vtList.map((tpl) => (
                   <div key={tpl.secondTemplateId || tpl.templateId} className="rounded-lg border border-slate-200 bg-white p-2.5">
                     <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(tpl.templateId)}
+                        onChange={() => toggleSel(tpl.templateId)}
+                        disabled={!tpl.templateId}
+                        className="h-3.5 w-3.5 shrink-0 accent-indigo-600"
+                      />
                       <span className="text-[11px] font-medium text-slate-500">{c.volcIdLabel}</span>
                       <button
                         type="button"
@@ -249,6 +305,28 @@ export function ChannelDialog({
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {vtList && vtList.length > 0 && (
+              <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-2">
+                <button
+                  type="button"
+                  onClick={toggleAll}
+                  className="rounded border border-slate-300 px-2 py-1 text-[11px] text-slate-600 hover:bg-white"
+                >
+                  {c.importSelectAll}
+                </button>
+                <button
+                  type="button"
+                  onClick={importSelected}
+                  disabled={importing || selected.size === 0}
+                  className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"
+                >
+                  {importing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                  {importing ? c.importing : `${c.importSelected}${selected.size ? ` (${selected.size})` : ""}`}
+                </button>
+                {importMsg && <span className="text-[11px] text-emerald-600">{importMsg}</span>}
               </div>
             )}
           </div>

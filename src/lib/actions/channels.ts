@@ -59,6 +59,67 @@ function str(fd: FormData, k: string) {
   return String(fd.get(k) ?? "").trim();
 }
 
+export type ImportTemplateInput = {
+  templateId: string; // S1T 一级模板ID（发送用，存 providerTemplateId）
+  sign?: string;
+  content?: string;
+  variables?: string[];
+  name?: string;
+};
+
+export type ImportResult = { ok: boolean; error?: string; created?: number; skipped?: number };
+
+/** 把火山查询到的模板一键添加为平台 SMS 模板 */
+export async function importVolcTemplatesAction(items: ImportTemplateInput[]): Promise<ImportResult> {
+  const user = await requireUser();
+  const t = getDictionary(await getLocale()).channels;
+  if (!canAccessFeature(user, "templates")) return { ok: false, error: t.importNoPerm };
+  if (!Array.isArray(items) || items.length === 0) return { ok: false, error: t.importNone };
+
+  let created = 0;
+  let skipped = 0;
+  for (const it of items) {
+    const providerTemplateId = (it.templateId || "").trim();
+    if (!providerTemplateId) {
+      skipped++;
+      continue;
+    }
+    // 已按同一个服务商模板ID导入过 → 跳过，避免重复
+    const dup = await prisma.template.findFirst({ where: { providerTemplateId } });
+    if (dup) {
+      skipped++;
+      continue;
+    }
+    // 生成唯一 code：用 S1T 尾段，冲突则追加序号
+    const base = `sms_${providerTemplateId.replace(/^S1T_/i, "").slice(0, 12)}`.toLowerCase();
+    let code = base;
+    for (let i = 2; await prisma.template.findUnique({ where: { code } }); i++) {
+      code = `${base}_${i}`;
+    }
+    const content = (it.content || "").trim();
+    const name = (it.name || "").trim() || content.slice(0, 20) || code;
+    const variables = Array.isArray(it.variables) ? it.variables.filter(Boolean) : [];
+
+    await prisma.template.create({
+      data: {
+        code,
+        name,
+        method: "SMS",
+        content,
+        signName: (it.sign || "").trim() || null,
+        providerTemplateId,
+        variables: JSON.stringify(variables),
+        enabled: true,
+      },
+    });
+    created++;
+  }
+
+  await logOperation(user, "template.create", `火山导入 ${created} 个模板`);
+  revalidatePath("/templates");
+  return { ok: true, created, skipped };
+}
+
 // ---------- 分组 ----------
 
 export async function createGroupAction(_prev: FormState, fd: FormData): Promise<FormState> {
