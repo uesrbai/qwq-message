@@ -123,7 +123,7 @@ export function TemplateDialog({
           </Field>
         )}
         {isSms && (
-          <Field label={t.signName}>
+          <Field label={t.signName} help={t.signNameHelp}>
             <input name="signName" {...bind("signName")} className={inputCls} />
           </Field>
         )}
