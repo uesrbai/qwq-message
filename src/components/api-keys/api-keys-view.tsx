@@ -110,6 +110,29 @@ export function ApiKeysView({
         </div>
       </div>
 
+      {/* 兼容接入：让别的推送系统按各自格式发进来 */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-slate-900">{t.compatTitle}</h2>
+        <p className="mt-1 text-sm text-slate-500">{t.compatHint}</p>
+        <div className="mt-3 space-y-2.5">
+          {[
+            { name: "Server酱", url: `${baseUrl}/api/compat/serverchan/<密钥>~<分组编号>.send` },
+            { name: "PushPlus", url: `${baseUrl}/api/compat/pushplus/send`, note: t.compatPushplusNote },
+            { name: "Bark", url: `${baseUrl}/api/compat/bark/<密钥>~<分组编号>` },
+            { name: "通用 / Generic", url: `${baseUrl}/api/compat/generic/<密钥>~<分组编号>` },
+          ].map((row) => (
+            <div key={row.name} className="flex items-center gap-2">
+              <span className="w-24 shrink-0 text-xs font-medium text-slate-600">{row.name}</span>
+              <code className="flex-1 overflow-x-auto whitespace-nowrap rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                {row.url}
+              </code>
+              <CopyButton text={row.url} label={t.copy} copied={t.copied} />
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">{t.compatNote}</p>
+      </div>
+
       {/* 默认限速设置 */}
       <div className="rounded-xl border border-slate-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-slate-900">{t.defaultRateLimit}</h2>

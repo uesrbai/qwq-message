@@ -20,7 +20,8 @@
 10. [限速、IP 白名单与容灾](#10-限速ip-白名单与容灾)
 11. [多语言 SDK 示例](#11-多语言-sdk-示例)
 12. [常见问题 FAQ](#12-常见问题-faq)
-13. [附录 A：qwq-sso 单点登录（管理员）](#附录-aqwq-sso-单点登录管理员)
+13. [兼容其他推送系统（Server酱 / PushPlus / Bark / 通用）](#13-兼容其他推送系统server酱--pushplus--bark--通用)
+14. [附录 A：qwq-sso 单点登录（管理员）](#附录-aqwq-sso-单点登录管理员)
 
 ---
 
@@ -95,6 +96,7 @@ Authorization: Bearer qwq_live_xxxxxxxxxxxxxxxx
 | POST | `/api/v1/send` | 发送一条通知 |
 | GET  | `/api/v1/templates` | 列出当前密钥可见的所有模板 |
 | GET  | `/api/v1/templates?code=<编号>` | 查询单个模板及其变量骨架 |
+| POST | `/api/compat/*` | 兼容其他推送系统（Server酱/PushPlus/Bark/通用），见 [第 13 节](#13-兼容其他推送系统server酱--pushplus--bark--通用) |
 
 ---
 
@@ -485,6 +487,65 @@ A：这是火山返回的错误，按优先级排查三点：① `templateCode` 
 
 **Q：为什么"查询我的模板"返回的 ID 和火山控制台显示的不一样？**
 A：火山一个模板有一级(S1T)/二级(S2T)/三级(S3T)/数字等多个 ID，控制台和接口展示的层级不同。**发送只认 S1T**，本平台查询已直接给你 S1T，照它用即可。
+
+---
+
+## 13. 兼容其他推送系统（Server酱 / PushPlus / Bark / 通用）
+
+如果你的业务或告警系统**已经在用** Server酱、PushPlus、Bark 这类推送服务，**不用改代码**，
+只要把它们的"推送地址 / token"换成本平台的兼容端点，消息就会进入本平台并按你配置的**分组**分发。
+
+**核心约定**：这些系统通常只让你填一个 token，所以本平台的 token 统一用
+
+```
+<你的API密钥>~<分组编号>
+```
+
+例如 `qwq_live_abcd1234~sms-notice`。也可以在 URL 后加 `?group=<分组编号>` 覆盖。
+消息的 `标题 + 正文` 会拼成 `content` 发到该分组（分组走短信就发短信，走群机器人就发群消息，以此类推）。
+
+### 13.1 各系统怎么填
+
+| 系统 | 地址 / 配置 | 标题字段 | 正文字段 |
+|------|-------------|----------|----------|
+| **Server酱** | 把 SendKey 设为 `你的密钥~分组编号`，请求地址 `https://<域名>/api/compat/serverchan/<密钥~分组编号>.send` | `title` | `desp` |
+| **PushPlus** | 地址 `https://<域名>/api/compat/pushplus/send`，body 里 `token` = `你的密钥~分组编号` | `title` | `content` |
+| **Bark** | `https://<域名>/api/compat/bark/<密钥~分组编号>/<标题>/<正文>`，或只填 key 用 JSON `{title,body}` | `title` | `body` |
+| **通用** | `https://<域名>/api/compat/generic/<密钥~分组编号>`，JSON/表单/query 皆可 | `title` | `content`/`body`/`text`/`message` |
+
+> 在后台「API 管理」页有一张「兼容接入」卡片，直接给出你专属域名的四个地址模板，复制即用。
+
+### 13.2 示例
+
+```bash
+# Server酱 风格
+curl "https://qwq-message.zeabur.app/api/compat/serverchan/qwq_live_xxx~ops-alert.send" \
+  -d "title=服务器告警" -d "desp=CPU 使用率 92%"
+
+# PushPlus 风格
+curl -X POST "https://qwq-message.zeabur.app/api/compat/pushplus/send" \
+  -H "Content-Type: application/json" \
+  -d '{"token":"qwq_live_xxx~ops-alert","title":"服务器告警","content":"CPU 92%"}'
+
+# Bark 风格（路径式）
+curl "https://qwq-message.zeabur.app/api/compat/bark/qwq_live_xxx~ops-alert/服务器告警/CPU%2092%25"
+
+# 通用
+curl -X POST "https://qwq-message.zeabur.app/api/compat/generic/qwq_live_xxx~ops-alert" \
+  -H "Content-Type: application/json" -d '{"title":"服务器告警","content":"CPU 92%"}'
+```
+
+### 13.3 返回格式
+
+各端点**按对应系统的原生格式**返回，方便原客户端识别成功/失败：
+
+- Server酱：成功 `{"code":0,"message":"","data":{...}}`，失败 `{"code":<非0>,"message":"..."}`
+- PushPlus：成功 `{"code":200,"msg":"请求成功"}`，失败 `{"code":<非200>,"msg":"..."}`
+- Bark：成功 `{"code":200,"message":"success"}`
+- 通用：成功 `{"success":true}`，失败 `{"success":false,"error":"..."}`
+
+> 认证、IP 白名单、限速、方式权限、容灾等规则与主接口一致：token 里的密钥无效返回 401、
+> 生产密钥非白名单 IP 返回 403、分组不存在返回 404、全部渠道失败返回 502。
 
 ---
 

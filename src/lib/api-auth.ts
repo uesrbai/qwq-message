@@ -32,9 +32,15 @@ export function keyAllowsMethod(key: NonNullable<ApiKeyRecord>, method: string):
   }
 }
 
-/** 校验请求里的 API 密钥：有效性 + 生产 IP 白名单 + 测试限速 */
+/** 校验请求头里的 Bearer API 密钥 */
 export async function authenticateApiKey(req: Request): Promise<ApiAuthResult> {
   const raw = extractBearer(req);
+  if (!raw) return { ok: false, status: 401, error: "缺少 API 密钥 / missing API key" };
+  return authenticateRawKey(raw, req);
+}
+
+/** 按原始密钥字符串校验（供兼容端点用，密钥来自 URL/body 而非 Bearer 头） */
+export async function authenticateRawKey(raw: string, req: Request): Promise<ApiAuthResult> {
   if (!raw) return { ok: false, status: 401, error: "缺少 API 密钥 / missing API key" };
 
   const key = await prisma.apiKey.findUnique({ where: { keyHash: hashApiKey(raw) } });

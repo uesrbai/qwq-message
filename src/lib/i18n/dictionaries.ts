@@ -257,6 +257,12 @@ const zh = {
   apiKeys: {
     baseUrlTitle: "接口地址",
     baseUrlHint: "外部系统向此地址发 POST 请求，带上密钥即可触发发送。",
+    compatTitle: "兼容接入（对接其他推送系统）",
+    compatHint:
+      "已用 Server酱 / PushPlus / Bark 或类似系统？把它们的推送地址换成下面对应的地址即可，不用改代码。地址里的 token 用「你的API密钥~分组编号」，消息会按该分组分发。",
+    compatPushplusNote: "token 放在 body：你的密钥~分组编号",
+    compatNote:
+      "把 <密钥> 换成你的真实 API 密钥、<分组编号> 换成目标分组编号（如 sms-notice）。也可用 ?group=分组编号 覆盖。生产密钥仍受 IP 白名单限制。",
     example: "调用示例",
     createKey: "创建密钥",
     keyName: "密钥名称",
@@ -722,6 +728,12 @@ const en: Dictionary = {
   apiKeys: {
     baseUrlTitle: "API endpoint",
     baseUrlHint: "External systems send a POST request here with a key to trigger a send.",
+    compatTitle: "Compatible endpoints (drop-in for other push systems)",
+    compatHint:
+      "Already using Server酱 / PushPlus / Bark or similar? Just swap their push URL for the matching one below — no code changes. Use \"<your-key>~<group-code>\" as the token; messages dispatch via that group.",
+    compatPushplusNote: "token goes in the body: <your-key>~<group-code>",
+    compatNote:
+      "Replace <密钥> with your real API key and <分组编号> with the target group code (e.g. sms-notice). You can also override with ?group=<code>. Production keys still enforce the IP allowlist.",
     example: "Example request",
     createKey: "Create key",
     keyName: "Key name",
