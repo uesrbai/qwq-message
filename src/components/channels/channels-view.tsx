@@ -18,6 +18,13 @@ import {
   deleteChannelAction,
   setChannelEnabledAction,
 } from "@/lib/actions/channels";
+import {
+  NewFolderButton,
+  FolderHeader,
+  MoveToFolderSelect,
+  groupByFolder,
+  type FolderDTO,
+} from "@/components/folders/folders-ui";
 
 export type ChannelDTO = {
   id: string;
@@ -35,6 +42,7 @@ export type GroupDTO = {
   name: string;
   strategy: string;
   enabled: boolean;
+  folderId?: string | null;
   channels: ChannelDTO[];
 };
 
@@ -44,9 +52,11 @@ const btnPrimary =
 export function ChannelsView({
   groups,
   allowedMethods,
+  folders,
 }: {
   groups: GroupDTO[];
   allowedMethods: string[] | null;
+  folders: FolderDTO[];
 }) {
   const { dict, locale } = useI18n();
   const c = dict.channels;
@@ -92,13 +102,16 @@ export function ChannelsView({
             </Tab>
           ))}
         </div>
-        <button onClick={openNewGroup} className={btnPrimary}>
-          <Plus className="h-4 w-4" />
-          {c.newGroup}
-        </button>
+        <div className="flex items-center gap-2">
+          <NewFolderButton kind="GROUP" />
+          <button onClick={openNewGroup} className={btnPrimary}>
+            <Plus className="h-4 w-4" />
+            {c.newGroup}
+          </button>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && folders.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
             <Boxes className="h-6 w-6" />
@@ -106,17 +119,31 @@ export function ChannelsView({
           <p className="mt-4 text-sm text-slate-400">{c.noGroups}</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map((g) => (
-            <GroupCard
-              key={g.id}
-              group={g}
-              onEdit={() => openEditGroup(g)}
-              onAddChannel={() => openAddChannel(g)}
-              onEditChannel={(ch) => openEditChannel(g, ch)}
-            />
-          ))}
-        </div>
+        groupByFolder(filtered, folders).map((section) => {
+          // 未分类且为空时不显示；文件夹即使为空也显示（作为归类目标）
+          if (!section.folder && section.items.length === 0) return null;
+          return (
+            <div key={section.folder?.id ?? "_uncat"}>
+              <FolderHeader folder={section.folder} count={section.items.length} />
+              {section.items.length === 0 ? (
+                <p className="pb-2 pl-6 text-xs text-slate-300">—</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {section.items.map((g) => (
+                    <GroupCard
+                      key={g.id}
+                      group={g}
+                      folders={folders}
+                      onEdit={() => openEditGroup(g)}
+                      onAddChannel={() => openAddChannel(g)}
+                      onEditChannel={(ch) => openEditChannel(g, ch)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       {groupDialog.open && (
@@ -166,11 +193,13 @@ function Tab({
 
 function GroupCard({
   group,
+  folders,
   onEdit,
   onAddChannel,
   onEditChannel,
 }: {
   group: GroupDTO;
+  folders: FolderDTO[];
   onEdit: () => void;
   onAddChannel: () => void;
   onEditChannel: (ch: ChannelDTO) => void;
@@ -196,6 +225,12 @@ function GroupCard({
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <MoveToFolderSelect
+            kind="GROUP"
+            itemId={group.id}
+            currentFolderId={group.folderId}
+            folders={folders}
+          />
           <Link
             href={`/logs?group=${encodeURIComponent(group.code)}`}
             title={c.viewLogs}

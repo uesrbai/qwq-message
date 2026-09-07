@@ -40,6 +40,18 @@ model User {
   @@unique([ssoProvider, ssoSubject])
 }
 
+/// 文件夹（纯归类，不参与发送）：kind 区分归类对象（GROUP/TEMPLATE/CHANNEL）
+model Folder {
+  id        String   @id @default(cuid())
+  kind      String // GROUP | TEMPLATE | CHANNEL
+  name      String
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([kind])
+}
+
 /// 分组（二级）：属于某种分发方式，内含多个渠道
 model ChannelGroup {
   id        String   @id @default(cuid())
@@ -49,6 +61,7 @@ model ChannelGroup {
   strategy  String   @default("ROUND_ROBIN") // ROUND_ROBIN | LEAST_USED
   enabled   Boolean  @default(true)
   rrCursor  Int      @default(0) // 轮询指针
+  folderId  String? // 纯归类用，不影响发送
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -67,6 +80,7 @@ model Channel {
   enabled    Boolean       @default(true)
   weight     Int           @default(1)
   rateLimitPerMin Int? // 发送限速：每分钟最多发多少条，超了自动跳过该渠道
+  folderId   String? // 纯归类用，不影响发送
   usageCount Int           @default(0)
   lastUsedAt DateTime?
   createdAt  DateTime      @default(now())
@@ -88,6 +102,7 @@ model Template {
   signName           String? // 短信签名
   providerTemplateId String? // 服务商侧模板ID
   variables          String        @default("[]") // JSON：变量清单
+  folderId           String? // 纯归类用，不影响发送
   enabled            Boolean       @default(true)
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt

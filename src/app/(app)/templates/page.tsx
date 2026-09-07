@@ -5,6 +5,7 @@ import { allowedMethods } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { TemplatesView, type TemplateDTO } from "@/components/templates/templates-view";
 import type { GroupOpt } from "@/components/templates/template-dialog";
+import type { FolderDTO } from "@/components/folders/folders-ui";
 
 export default async function TemplatesPage() {
   const user = await requireFeature("templates");
@@ -12,7 +13,7 @@ export default async function TemplatesPage() {
   const { dict } = await getI18n();
   const p = dict.pages.templates;
 
-  const [templates, groups] = await Promise.all([
+  const [templates, groups, folderRows] = await Promise.all([
     prisma.template.findMany({
       where: allowed ? { method: { in: allowed } } : undefined,
       include: { group: true },
@@ -22,7 +23,9 @@ export default async function TemplatesPage() {
       where: allowed ? { method: { in: allowed } } : undefined,
       orderBy: [{ method: "asc" }, { createdAt: "asc" }],
     }),
+    prisma.folder.findMany({ where: { kind: "TEMPLATE" }, orderBy: { createdAt: "asc" } }),
   ]);
+  const folders: FolderDTO[] = folderRows.map((f) => ({ id: f.id, name: f.name }));
 
   const tdtos: TemplateDTO[] = templates.map((tpl) => ({
     id: tpl.id,
@@ -37,6 +40,7 @@ export default async function TemplatesPage() {
     providerTemplateId: tpl.providerTemplateId,
     variables: tpl.variables,
     enabled: tpl.enabled,
+    folderId: tpl.folderId,
   }));
 
   const gopts: GroupOpt[] = groups.map((g) => ({
@@ -49,7 +53,7 @@ export default async function TemplatesPage() {
   return (
     <>
       <PageHeader title={p.title} description={p.desc} />
-      <TemplatesView templates={tdtos} groups={gopts} allowedMethods={allowed} />
+      <TemplatesView templates={tdtos} groups={gopts} allowedMethods={allowed} folders={folders} />
     </>
   );
 }

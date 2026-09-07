@@ -4,6 +4,7 @@ import { requireFeature } from "@/lib/auth";
 import { allowedMethods } from "@/lib/permissions";
 import { PageHeader } from "@/components/page-header";
 import { ChannelsView, type GroupDTO } from "@/components/channels/channels-view";
+import type { FolderDTO } from "@/components/folders/folders-ui";
 
 export default async function ChannelsPage() {
   const user = await requireFeature("channels");
@@ -11,11 +12,15 @@ export default async function ChannelsPage() {
   const { dict } = await getI18n();
   const p = dict.pages.channels;
 
-  const raw = await prisma.channelGroup.findMany({
-    where: allowed ? { method: { in: allowed } } : undefined,
-    include: { channels: { orderBy: { createdAt: "asc" } } },
-    orderBy: [{ method: "asc" }, { createdAt: "asc" }],
-  });
+  const [raw, folderRows] = await Promise.all([
+    prisma.channelGroup.findMany({
+      where: allowed ? { method: { in: allowed } } : undefined,
+      include: { channels: { orderBy: { createdAt: "asc" } } },
+      orderBy: [{ method: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.folder.findMany({ where: { kind: "GROUP" }, orderBy: { createdAt: "asc" } }),
+  ]);
+  const folders: FolderDTO[] = folderRows.map((f) => ({ id: f.id, name: f.name }));
 
   const groups: GroupDTO[] = raw.map((g) => ({
     id: g.id,
@@ -24,6 +29,7 @@ export default async function ChannelsPage() {
     name: g.name,
     strategy: g.strategy,
     enabled: g.enabled,
+    folderId: g.folderId,
     channels: g.channels.map((ch) => ({
       id: ch.id,
       provider: ch.provider,
@@ -38,7 +44,7 @@ export default async function ChannelsPage() {
   return (
     <>
       <PageHeader title={p.title} description={p.desc} />
-      <ChannelsView groups={groups} allowedMethods={allowed} />
+      <ChannelsView groups={groups} allowedMethods={allowed} folders={folders} />
     </>
   );
 }

@@ -6,17 +6,30 @@ import { useI18n } from "../i18n-provider";
 import { METHOD_KEYS, type MethodKey } from "@/lib/constants";
 import { TemplateDialog, type GroupOpt, type TemplateEdit } from "./template-dialog";
 import { deleteTemplateAction, setTemplateEnabledAction } from "@/lib/actions/templates";
+import {
+  NewFolderButton,
+  FolderHeader,
+  MoveToFolderSelect,
+  groupByFolder,
+  type FolderDTO,
+} from "@/components/folders/folders-ui";
 
-export type TemplateDTO = TemplateEdit & { groupName: string | null; enabled: boolean };
+export type TemplateDTO = TemplateEdit & {
+  groupName: string | null;
+  enabled: boolean;
+  folderId?: string | null;
+};
 
 export function TemplatesView({
   templates,
   groups,
   allowedMethods,
+  folders,
 }: {
   templates: TemplateDTO[];
   groups: GroupOpt[];
   allowedMethods: string[] | null;
+  folders: FolderDTO[];
 }) {
   const { dict, locale } = useI18n();
   const t = dict.templates;
@@ -46,18 +59,21 @@ export function TemplatesView({
             </Tab>
           ))}
         </div>
-        <button
-          onClick={() =>
-            setDialog({ open: true, method: activeMethod === "ALL" ? defaultMethod : activeMethod })
-          }
-          className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-        >
-          <Plus className="h-4 w-4" />
-          {t.newTemplate}
-        </button>
+        <div className="flex items-center gap-2">
+          <NewFolderButton kind="TEMPLATE" />
+          <button
+            onClick={() =>
+              setDialog({ open: true, method: activeMethod === "ALL" ? defaultMethod : activeMethod })
+            }
+            className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            <Plus className="h-4 w-4" />
+            {t.newTemplate}
+          </button>
+        </div>
       </div>
 
-      {filtered.length === 0 ? (
+      {filtered.length === 0 && folders.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400">
             <FileText className="h-6 w-6" />
@@ -65,15 +81,28 @@ export function TemplatesView({
           <p className="mt-4 text-sm text-slate-400">{t.noTemplates}</p>
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {filtered.map((tpl) => (
-            <TemplateCard
-              key={tpl.id}
-              tpl={tpl}
-              onEdit={() => setDialog({ open: true, edit: tpl, method: tpl.method as MethodKey })}
-            />
-          ))}
-        </div>
+        groupByFolder(filtered, folders).map((section) => {
+          if (!section.folder && section.items.length === 0) return null;
+          return (
+            <div key={section.folder?.id ?? "_uncat"}>
+              <FolderHeader folder={section.folder} count={section.items.length} />
+              {section.items.length === 0 ? (
+                <p className="pb-2 pl-6 text-xs text-slate-300">—</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {section.items.map((tpl) => (
+                    <TemplateCard
+                      key={tpl.id}
+                      tpl={tpl}
+                      folders={folders}
+                      onEdit={() => setDialog({ open: true, edit: tpl, method: tpl.method as MethodKey })}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
       )}
 
       {dialog.open && (
@@ -103,7 +132,15 @@ function Tab({ active, onClick, children }: { active: boolean; onClick: () => vo
   );
 }
 
-function TemplateCard({ tpl, onEdit }: { tpl: TemplateDTO; onEdit: () => void }) {
+function TemplateCard({
+  tpl,
+  folders,
+  onEdit,
+}: {
+  tpl: TemplateDTO;
+  folders: FolderDTO[];
+  onEdit: () => void;
+}) {
   const { dict } = useI18n();
   const t = dict.templates;
   return (
@@ -130,6 +167,12 @@ function TemplateCard({ tpl, onEdit }: { tpl: TemplateDTO; onEdit: () => void })
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <MoveToFolderSelect
+            kind="TEMPLATE"
+            itemId={tpl.id}
+            currentFolderId={tpl.folderId}
+            folders={folders}
+          />
           <form action={setTemplateEnabledAction}>
             <input type="hidden" name="id" value={tpl.id} />
             <input type="hidden" name="enabled" value={(!tpl.enabled).toString()} />
