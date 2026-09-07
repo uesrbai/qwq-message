@@ -33,15 +33,21 @@ async function setItemFolder(kind: FolderKind, itemId: string, folderId: string 
   }
 }
 
-export async function createFolderAction(kind: string, name: string): Promise<FolderResult> {
+export async function createFolderAction(
+  kind: string,
+  name: string,
+  scopeId?: string,
+): Promise<FolderResult> {
   const user = await requireUser();
   const t = getDictionary(await getLocale()).folders;
   if (!isKind(kind)) return { error: t.errKind };
   if (!canAccessFeature(user, KIND_META[kind].feature)) return { error: t.errNoPerm };
   const trimmed = name.trim();
   if (!trimmed) return { error: t.errName };
+  // 只有 CHANNEL 文件夹归属某个分组
+  const scope = kind === "CHANNEL" ? (scopeId || null) : null;
 
-  const f = await prisma.folder.create({ data: { kind, name: trimmed } });
+  const f = await prisma.folder.create({ data: { kind, name: trimmed, scopeId: scope } });
   await logOperation(user, "folder.create", `${kind}:${trimmed}`);
   revalidatePath(KIND_META[kind].path);
   return { ok: true, id: f.id };

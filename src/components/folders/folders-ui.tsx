@@ -11,7 +11,7 @@ import {
   type FolderKind,
 } from "@/lib/actions/folders";
 
-export type FolderDTO = { id: string; name: string };
+export type FolderDTO = { id: string; name: string; scopeId?: string | null };
 
 /** 把带 folderId 的项按文件夹分区：返回 [{folder, items}...] + 未分类 */
 export function groupByFolder<T extends { folderId?: string | null }>(
@@ -28,8 +28,16 @@ export function groupByFolder<T extends { folderId?: string | null }>(
   return sections;
 }
 
-/** 新建文件夹按钮（点开变输入框） */
-export function NewFolderButton({ kind }: { kind: FolderKind }) {
+/** 新建文件夹按钮（点开变输入框）；compact 用于卡片内部的小尺寸样式 */
+export function NewFolderButton({
+  kind,
+  scopeId,
+  compact,
+}: {
+  kind: FolderKind;
+  scopeId?: string;
+  compact?: boolean;
+}) {
   const { dict } = useI18n();
   const t = dict.folders;
   const [open, setOpen] = useState(false);
@@ -40,9 +48,13 @@ export function NewFolderButton({ kind }: { kind: FolderKind }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        className={
+          compact
+            ? "inline-flex items-center gap-1 rounded-md border border-slate-200 px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50"
+            : "inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        }
       >
-        <FolderPlus className="h-4 w-4" />
+        <FolderPlus className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} />
         {t.newFolder}
       </button>
     );
@@ -50,7 +62,7 @@ export function NewFolderButton({ kind }: { kind: FolderKind }) {
   const submit = () => {
     if (!name.trim()) return;
     start(async () => {
-      await createFolderAction(kind, name);
+      await createFolderAction(kind, name, scopeId);
       setName("");
       setOpen(false);
     });

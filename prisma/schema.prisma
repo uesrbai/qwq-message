@@ -45,11 +45,12 @@ model Folder {
   id        String   @id @default(cuid())
   kind      String // GROUP | TEMPLATE | CHANNEL
   name      String
+  scopeId   String? // CHANNEL 文件夹归属的分组id；GROUP/TEMPLATE 为空（全局）
   sort      Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([kind])
+  @@index([kind, scopeId])
 }
 
 /// 分组（二级）：属于某种分发方式，内含多个渠道

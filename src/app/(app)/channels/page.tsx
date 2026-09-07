@@ -12,15 +12,21 @@ export default async function ChannelsPage() {
   const { dict } = await getI18n();
   const p = dict.pages.channels;
 
-  const [raw, folderRows] = await Promise.all([
+  const [raw, folderRows, channelFolderRows] = await Promise.all([
     prisma.channelGroup.findMany({
       where: allowed ? { method: { in: allowed } } : undefined,
       include: { channels: { orderBy: { createdAt: "asc" } } },
       orderBy: [{ method: "asc" }, { createdAt: "asc" }],
     }),
     prisma.folder.findMany({ where: { kind: "GROUP" }, orderBy: { createdAt: "asc" } }),
+    prisma.folder.findMany({ where: { kind: "CHANNEL" }, orderBy: { createdAt: "asc" } }),
   ]);
   const folders: FolderDTO[] = folderRows.map((f) => ({ id: f.id, name: f.name }));
+  const channelFolders: FolderDTO[] = channelFolderRows.map((f) => ({
+    id: f.id,
+    name: f.name,
+    scopeId: f.scopeId,
+  }));
 
   const groups: GroupDTO[] = raw.map((g) => ({
     id: g.id,
@@ -38,13 +44,19 @@ export default async function ChannelsPage() {
       enabled: ch.enabled,
       weight: ch.weight,
       rateLimitPerMin: ch.rateLimitPerMin,
+      folderId: ch.folderId,
     })),
   }));
 
   return (
     <>
       <PageHeader title={p.title} description={p.desc} />
-      <ChannelsView groups={groups} allowedMethods={allowed} folders={folders} />
+      <ChannelsView
+        groups={groups}
+        allowedMethods={allowed}
+        folders={folders}
+        channelFolders={channelFolders}
+      />
     </>
   );
 }

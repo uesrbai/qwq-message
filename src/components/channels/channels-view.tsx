@@ -34,6 +34,7 @@ export type ChannelDTO = {
   enabled: boolean;
   weight: number;
   rateLimitPerMin: number | null;
+  folderId?: string | null;
 };
 export type GroupDTO = {
   id: string;
@@ -53,10 +54,12 @@ export function ChannelsView({
   groups,
   allowedMethods,
   folders,
+  channelFolders,
 }: {
   groups: GroupDTO[];
   allowedMethods: string[] | null;
   folders: FolderDTO[];
+  channelFolders: FolderDTO[];
 }) {
   const { dict, locale } = useI18n();
   const c = dict.channels;
@@ -134,6 +137,7 @@ export function ChannelsView({
                       key={g.id}
                       group={g}
                       folders={folders}
+                      channelFolders={channelFolders.filter((f) => f.scopeId === g.id)}
                       onEdit={() => openEditGroup(g)}
                       onAddChannel={() => openAddChannel(g)}
                       onEditChannel={(ch) => openEditChannel(g, ch)}
@@ -194,18 +198,83 @@ function Tab({
 function GroupCard({
   group,
   folders,
+  channelFolders,
   onEdit,
   onAddChannel,
   onEditChannel,
 }: {
   group: GroupDTO;
   folders: FolderDTO[];
+  channelFolders: FolderDTO[];
   onEdit: () => void;
   onAddChannel: () => void;
   onEditChannel: (ch: ChannelDTO) => void;
 }) {
   const { dict, locale } = useI18n();
   const c = dict.channels;
+  const useChannelFolders = channelFolders.length > 0;
+
+  const renderChannel = (ch: ChannelDTO) => (
+    <div
+      key={ch.id}
+      className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className={`h-1.5 w-1.5 rounded-full ${ch.enabled ? "bg-emerald-500" : "bg-slate-300"}`} />
+          <span className="truncate text-sm font-medium text-slate-800">{ch.name}</span>
+        </div>
+        <div className="mt-0.5 pl-3.5 text-xs text-slate-400">
+          {providerLabel(ch.provider, locale)} · {c.weight} {ch.weight}
+          {ch.rateLimitPerMin ? ` · ${ch.rateLimitPerMin} ${dict.apiKeys.perMin}` : ""}
+          {!ch.enabled ? ` · ${c.disabledTag}` : ""}
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center gap-1">
+        <MoveToFolderSelect
+          kind="CHANNEL"
+          itemId={ch.id}
+          currentFolderId={ch.folderId}
+          folders={channelFolders}
+        />
+        <form action={setChannelEnabledAction}>
+          <input type="hidden" name="id" value={ch.id} />
+          <input type="hidden" name="enabled" value={(!ch.enabled).toString()} />
+          <button
+            type="submit"
+            title={ch.enabled ? c.disable : c.enable}
+            className={`rounded p-1 ${
+              ch.enabled ? "text-emerald-500 hover:bg-emerald-100" : "text-slate-300 hover:bg-slate-200"
+            }`}
+          >
+            <Power className="h-3.5 w-3.5" />
+          </button>
+        </form>
+        <button
+          onClick={() => onEditChannel(ch)}
+          title={c.edit}
+          className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </button>
+        <form
+          action={deleteChannelAction}
+          onSubmit={(e) => {
+            if (!confirm(c.confirmDeleteChannel)) e.preventDefault();
+          }}
+        >
+          <input type="hidden" name="id" value={ch.id} />
+          <button
+            type="submit"
+            title={c.delete}
+            className="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-500"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 
   return (
     <div className={`rounded-xl border border-slate-200 bg-white ${group.enabled ? "" : "opacity-70"}`}>
@@ -276,78 +345,33 @@ function GroupCard({
         </div>
       </div>
 
-      {/* 渠道列表 */}
+      {/* 渠道列表（可按文件夹分小组） */}
       <div className="p-3">
         {group.channels.length === 0 ? (
           <p className="px-1 py-3 text-center text-xs text-slate-400">{c.noChannels}</p>
-        ) : (
-          <div className="space-y-2">
-            {group.channels.map((ch) => (
-              <div
-                key={ch.id}
-                className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${ch.enabled ? "bg-emerald-500" : "bg-slate-300"}`}
-                    />
-                    <span className="truncate text-sm font-medium text-slate-800">{ch.name}</span>
-                  </div>
-                  <div className="mt-0.5 pl-3.5 text-xs text-slate-400">
-                    {providerLabel(ch.provider, locale)} · {c.weight} {ch.weight}
-                    {ch.rateLimitPerMin ? ` · ${ch.rateLimitPerMin} ${dict.apiKeys.perMin}` : ""}
-                    {!ch.enabled ? ` · ${c.disabledTag}` : ""}
-                  </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  <form action={setChannelEnabledAction}>
-                    <input type="hidden" name="id" value={ch.id} />
-                    <input type="hidden" name="enabled" value={(!ch.enabled).toString()} />
-                    <button
-                      type="submit"
-                      title={ch.enabled ? c.disable : c.enable}
-                      className={`rounded p-1 ${
-                        ch.enabled ? "text-emerald-500 hover:bg-emerald-100" : "text-slate-300 hover:bg-slate-200"
-                      }`}
-                    >
-                      <Power className="h-3.5 w-3.5" />
-                    </button>
-                  </form>
-                  <button
-                    onClick={() => onEditChannel(ch)}
-                    title={c.edit}
-                    className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600"
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </button>
-                  <form
-                    action={deleteChannelAction}
-                    onSubmit={(e) => {
-                      if (!confirm(c.confirmDeleteChannel)) e.preventDefault();
-                    }}
-                  >
-                    <input type="hidden" name="id" value={ch.id} />
-                    <button
-                      type="submit"
-                      title={c.delete}
-                      className="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-500"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </form>
-                </div>
+        ) : useChannelFolders ? (
+          groupByFolder(group.channels, channelFolders).map((section) =>
+            section.items.length === 0 ? null : (
+              <div key={section.folder?.id ?? "_uncat"} className="mb-1">
+                <FolderHeader folder={section.folder} count={section.items.length} />
+                <div className="space-y-2">{section.items.map(renderChannel)}</div>
               </div>
-            ))}
-          </div>
+            ),
+          )
+        ) : (
+          <div className="space-y-2">{group.channels.map(renderChannel)}</div>
         )}
-        <button
-          onClick={onAddChannel}
-          className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600"
-        >
-          <Plus className="h-4 w-4" />
-          {c.addChannel}
-        </button>
+
+        <div className="mt-2 flex items-center gap-2">
+          <button
+            onClick={onAddChannel}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg border border-dashed border-slate-300 py-2 text-sm font-medium text-slate-500 hover:border-indigo-300 hover:text-indigo-600"
+          >
+            <Plus className="h-4 w-4" />
+            {c.addChannel}
+          </button>
+          <NewFolderButton kind="CHANNEL" scopeId={group.id} compact />
+        </div>
       </div>
     </div>
   );
